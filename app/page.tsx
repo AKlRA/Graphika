@@ -1,65 +1,153 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useEffect, useState, useCallback } from "react";
+import { motion } from "framer-motion";
+import Header from "@/components/Header";
+import BottomNav from "@/components/BottomNav";
+import HeroSection from "@/components/HeroSection";
+import TrendingRow from "@/components/TrendingRow";
+import MangaCard from "@/components/MangaCard";
+import Footer from "@/components/Footer";
+import { getTrending, type AniListMedia } from "@/lib/api/anilist";
+import { getLibrary, getProgress } from "@/lib/storage";
+
+interface ContinueItem {
+  media: AniListMedia;
+  progress: { chapter: number; totalChapters: number | null };
+}
+
+export default function HomePage() {
+  const [featuredList, setFeaturedList] = useState<AniListMedia[]>([]);
+  const [trendingManga, setTrendingManga] = useState<AniListMedia[]>([]);
+  const [trendingManhwa, setTrendingManhwa] = useState<AniListMedia[]>([]);
+  const [trendingManhua, setTrendingManhua] = useState<AniListMedia[]>([]);
+  const [continueReading, setContinueReading] = useState<ContinueItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchTrending = useCallback(async () => {
+    try {
+      setLoading(true);
+
+      const [manga, manhwa, manhua] = await Promise.all([
+        getTrending("JP", 1, 20),
+        getTrending("KR", 1, 20),
+        getTrending("CN", 1, 20),
+      ]);
+
+      setTrendingManga(manga);
+      setTrendingManhwa(manhwa);
+      setTrendingManhua(manhua);
+
+      // Pick a featured title: prefer one with a banner image
+      const allTrending = [...manga, ...manhwa];
+      const withBanner = allTrending.filter((m) => m.bannerImage);
+      const picks = withBanner.length > 0
+        ? withBanner.slice(0, 5)
+        : allTrending.slice(0, 5);
+      setFeaturedList(picks);
+    } catch (err) {
+      console.error("Failed to fetch trending:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const loadContinueReading = useCallback(async () => {
+    const library = getLibrary();
+    if (library.length === 0) return;
+
+    // Get progress for each library item
+    const items: ContinueItem[] = [];
+    for (const id of library.slice(0, 10)) {
+      const prog = getProgress(id);
+      if (prog) {
+        // We'd need cached media data — for now, fetch from AniList
+        try {
+          const results = await getTrending(undefined, 1, 1); // placeholder
+          if (results[0]) {
+            items.push({
+              media: { ...results[0], id },
+              progress: { chapter: prog.chapter, totalChapters: null },
+            });
+          }
+        } catch {
+          // skip
+        }
+      }
+    }
+    setContinueReading(items);
+  }, []);
+
+  useEffect(() => {
+    fetchTrending();
+    loadContinueReading();
+  }, [fetchTrending, loadContinueReading]);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <motion.div
+      className="min-h-dvh"
+      style={{ background: "var(--bg-base)" }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
+    >
+      <Header />
+
+      {/* Hero */}
+      <div className="pt-14">
+        <HeroSection mediaList={featuredList} loading={loading} />
+      </div>
+
+      {/* Content */}
+      <main className="md:ml-20 pb-4">
+        {/* Continue Reading */}
+        {continueReading.length > 0 && (
+          <section className="mt-8">
+            <h2
+              className="text-lg font-bold text-text-primary px-4 mb-3"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              Continue Reading
+            </h2>
+            <div className="snap-row">
+              {continueReading.map((item, i) => (
+                <MangaCard
+                  key={item.media.id}
+                  media={item.media}
+                  index={i}
+                  variant="continue"
+                  progress={item.progress}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Trending Manga */}
+        <TrendingRow
+          title="Trending Manga"
+          items={trendingManga}
+          loading={loading}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+
+        {/* Trending Manhwa */}
+        <TrendingRow
+          title="Trending Manhwa"
+          items={trendingManhwa}
+          loading={loading}
+        />
+
+        {/* Trending Manhua */}
+        <TrendingRow
+          title="Trending Manhua"
+          items={trendingManhua}
+          loading={loading}
+        />
+
+        <Footer />
       </main>
-    </div>
+
+      <BottomNav />
+    </motion.div>
   );
 }

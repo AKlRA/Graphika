@@ -1,26 +1,346 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
+/* ── Graphika Design System ── */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Dark Mode (Primary) */
+  --bg-base:        #08080E;
+  --bg-surface:     #0F0F1A;
+  --bg-elevated:    #16162A;
+  --bg-overlay:     #1E1E35;
+
+  --accent-violet:  #7C6FF7;
+  --accent-rose:    #F06292;
+  --accent-cyan:    #22D3EE;
+
+  --text-primary:   #EEEEF5;
+  --text-secondary: #9898B8;
+  --text-muted:     #55556A;
+
+  --border-subtle:  rgba(255,255,255,0.06);
+  --border-default: rgba(255,255,255,0.10);
+  --border-strong:  rgba(255,255,255,0.18);
+
+  --glass-bg:       rgba(15,15,26,0.75);
+  --glass-blur:     blur(24px);
+  --glass-border:   rgba(255,255,255,0.10);
+
+  /* Legacy aliases for compatibility */
+  --color-bg: var(--bg-base);
+  --color-surface: var(--bg-surface);
+  --color-surface-hover: var(--bg-elevated);
+  --color-accent: var(--accent-violet);
+  --color-accent-dim: rgba(124, 111, 247, 0.15);
+  --color-secondary: var(--accent-rose);
+  --color-secondary-dim: rgba(240, 98, 146, 0.15);
+  --color-highlight: var(--accent-cyan);
+  --color-highlight-dim: rgba(34, 211, 238, 0.15);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-glass-bg: var(--glass-bg);
+  --color-glass-border: var(--glass-border);
+  --color-glass-border-hover: var(--border-strong);
+
+  /* Fonts */
+  --font-display: var(--font-plus-jakarta);
+  --font-body: var(--font-inter);
+  --font-mono: var(--font-jetbrains);
+
+  /* Border radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Light Theme (Complete Redesign) */
+html.light {
+  background: #F7F7FC !important;
+  color: #0A0A1A !important;
+
+  --bg-base:        #F7F7FC;
+  --bg-surface:     #FFFFFF;
+  --bg-elevated:    #F0F0F8;
+  --bg-overlay:     #EAEAF5;
+
+  --accent-violet:  #6C63FF;
+  --accent-rose:    #E91E8C;
+  --accent-cyan:    #0891B2;
+
+  --text-primary:   #0A0A1A;
+  --text-secondary: #4A4A6A;
+  --text-muted:     #9898B0;
+
+  --border-subtle:  rgba(0,0,0,0.05);
+  --border-default: rgba(0,0,0,0.09);
+  --border-strong:  rgba(0,0,0,0.15);
+
+  --glass-bg:       rgba(255,255,255,0.82);
+  --glass-blur:     blur(24px);
+  --glass-border:   rgba(0,0,0,0.08);
+
+  /* Legacy aliases for light mode */
+  --color-bg: var(--bg-base);
+  --color-surface: var(--bg-surface);
+  --color-surface-hover: var(--bg-elevated);
+  --color-accent: var(--accent-violet);
+  --color-accent-dim: rgba(108, 99, 255, 0.15);
+  --color-secondary: var(--accent-rose);
+  --color-secondary-dim: rgba(233, 30, 140, 0.15);
+  --color-highlight: var(--accent-cyan);
+  --color-highlight-dim: rgba(8, 145, 178, 0.15);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-glass-bg: var(--glass-bg);
+  --color-glass-border: var(--glass-border);
+  --color-glass-border-hover: var(--border-strong);
+}
+
+html.light body {
+  background: var(--bg-base) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Force headings to color in light mode */
+html.light h1,
+html.light h2,
+html.light h3,
+html.light .text-text-primary {
+  color: var(--text-primary) !important;
+}
+
+html.light .text-text-secondary {
+  color: var(--text-secondary) !important;
+}
+
+/* Light mode card shadows instead of borders */
+html.light {
+  --card-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04);
+}
+
+/* ── Base ── */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  scroll-behavior: smooth;
+  overflow-x: hidden;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  font-family: var(--font-body), system-ui, sans-serif;
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Utility Classes ── */
+
+/* Glass panels */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur) saturate(180%);
+  -webkit-backdrop-filter: var(--glass-blur) saturate(180%);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+}
+
+/* ── Hero Section Card Effects ── */
+.hero-glass-card {
+  background: linear-gradient(145deg, rgba(22, 22, 36, 0.88) 0%, rgba(15, 15, 26, 0.92) 100%);
+  backdrop-filter: blur(32px) saturate(180%);
+  -webkit-backdrop-filter: blur(32px) saturate(180%);
+  border: 1px solid rgba(124, 111, 247, 0.25);
+  box-shadow: 
+    0 1px 2px rgba(0,0,0,0.4),       
+    0 8px 16px rgba(0,0,0,0.4),      
+    0 24px 48px rgba(0,0,0,0.5),     
+    inset 0 1px 0 rgba(255,255,255,0.08), 
+    inset 0 -1px 0 rgba(0,0,0,0.3);
+  transform: translateY(-4px);
+}
+
+.hero-glow-layer {
+  box-shadow: 0 20px 80px rgba(124,111,247,0.22), 0 8px 30px rgba(124,111,247,0.12);
+}
+
+/* Light Mode Overrides for Hero Card */
+html.light .hero-glass-card {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.95) 0%, rgba(247, 247, 252, 0.9) 100%);
+  border: 1px solid rgba(108, 99, 255, 0.2);
+  box-shadow: 
+    0 1px 3px rgba(0,0,0,0.05),
+    0 12px 24px rgba(0,0,0,0.08),
+    0 32px 64px rgba(0,0,0,0.06),
+    inset 0 1px 0 rgba(255,255,255,1);
+}
+
+html.light .hero-glow-layer {
+  box-shadow: 0 20px 80px rgba(108,99,255,0.15), 0 8px 30px rgba(108,99,255,0.08);
+}
+
+.glass-hover:hover {
+  border-color: var(--border-strong);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Skeleton loader pulse */
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.04; }
+  50% { opacity: 0.08; }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg-elevated) 25%,
+    var(--bg-overlay) 50%,
+    var(--bg-elevated) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.8s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}
+
+/* Light mode skeleton colors */
+html.light .skeleton {
+  background: linear-gradient(
+    90deg,
+    #EAEAF5 25%,
+    #F7F7FC 50%,
+    #EAEAF5 75%
+  );
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Snap scroll rows */
+.snap-row {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scroll-padding-left: 16px;
+  padding: 0 16px;
+}
+
+.snap-row::-webkit-scrollbar {
+  display: none;
+}
+
+.snap-row > * {
+  scroll-snap-align: start;
+  flex-shrink: 0;
+}
+
+/* Safe area */
+.safe-bottom {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 16px);
+}
+
+.safe-top {
+  padding-top: max(env(safe-area-inset-top, 0px), 0px);
+}
+
+/* Score arc */
+.score-arc {
+  transform: rotate(-90deg);
+}
+
+/* Text clamp */
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Bottom sheet overlay */
+.sheet-overlay {
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+}
+
+/* Genre pill gradient */
+.genre-pill {
+  background: rgba(124, 111, 247, 0.12);
+  border: 1px solid rgba(124, 111, 247, 0.25);
+  border-radius: var(--radius-full);
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-violet);
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+html.light .genre-pill {
+  background: rgba(108, 99, 255, 0.08);
+  border-color: rgba(108, 99, 255, 0.25);
+  color: var(--accent-violet);
+}
+
+/* Badge styles */
+.badge-md {
+  background: rgba(124, 111, 247, 0.2);
+  color: var(--accent-violet);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
+.badge-ck {
+  background: rgba(240, 98, 146, 0.2);
+  color: var(--accent-rose);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
+html.light .badge-md {
+  background: rgba(108, 99, 255, 0.15);
+  color: var(--accent-violet);
+}
+
+html.light .badge-ck {
+  background: rgba(233, 30, 140, 0.15);
+  color: var(--accent-rose);
+}
+
+/* Glow effects */
+.glow-accent {
+  box-shadow: 0 0 20px rgba(124, 111, 247, 0.3);
+}
+
+.glow-highlight {
+  box-shadow: 0 0 20px rgba(34, 211, 238, 0.3);
+}
+
+/* Progress bar */
+.progress-bar {
+  background: var(--border-default);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  height: 3px;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: linear-gradient(90deg, var(--accent-cyan), var(--accent-violet));
+  transition: width 0.6s ease-out;
 }
