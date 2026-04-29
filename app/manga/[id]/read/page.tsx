@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 
 import { getChapterImages } from "@/lib/api/mangadex";
+import { comickPages, buildProxiedImageUrl } from "@/lib/api/comick";
 import {
   getProgress,
   setProgress,
@@ -99,11 +100,13 @@ export default function ReaderPage({
 
   // ── Fetch images ──
   const fetchImages = useCallback(async () => {
-    // Check cache validity
+    // Check cache validity (MangaDex tokens expire, Comick URLs don't)
+    const isMangaDex = source === "mangadex";
+    const ttl = isMangaDex ? TOKEN_TTL : Infinity;
     if (
       imageCacheRef.current &&
       imageCacheRef.current.chapterId === chapterId &&
-      Date.now() - imageCacheRef.current.fetchedAt < TOKEN_TTL
+      Date.now() - imageCacheRef.current.fetchedAt < ttl
     ) {
       setImages(imageCacheRef.current.urls);
       setLoading(false);
@@ -116,20 +119,18 @@ export default function ReaderPage({
     try {
       let urls: string[];
 
-      // Only MangaDex AT-Home is supported for in-app reading
-      if (source === "mangadex") {
+      if (isMangaDex) {
+        // MangaDex AT-Home — direct image URLs (no proxy needed)
         const dataSaver = settings.imageQuality === "datasaver";
         urls = await getChapterImages(chapterId, dataSaver);
       } else {
-        // Non-MangaDex source reached the reader — this shouldn't happen
-        // but handle gracefully by showing external UI
-        setError("external");
-        setLoading(false);
-        return;
+        // Comick / other source — fetch page URLs and wrap through image proxy
+        const rawUrls = await comickPages(chapterId, source);
+        urls = rawUrls.map((u) => buildProxiedImageUrl(u, source));
       }
 
       if (urls.length === 0) {
-        // MangaDex chapter with no images (externally hosted, e.g. MangaPlus)
+        // Chapter with no images (externally hosted, e.g. MangaPlus)
         setError("external");
         setLoading(false);
         return;
@@ -383,7 +384,12 @@ export default function ReaderPage({
 
   // ── External chapter state ──
   if (error === "external") {
-    const openUrl = externalUrl || `https://mangadex.org/chapter/${chapterId}`;
+    // For MangaDex, chapterId is a UUID → construct mangadex URL
+    // For other sources, chapterId IS the chapter URL (e.g. https://mangakatana.com/...)
+    const isMdId = source === "mangadex" && !chapterId.startsWith("http");
+    const openUrl = externalUrl
+      || (isMdId ? `https://mangadex.org/chapter/${chapterId}` : chapterId)
+      || chapterId;
     return (
       <div
         className="fixed inset-0 flex items-center justify-center px-6"

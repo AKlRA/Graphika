@@ -89,8 +89,8 @@ function normalizeComickChapters(
       sourceUrl: ch.url,
       uploadedAt: ch.date || "",
       pageCount: undefined,
-      type: "external" as ChapterType, // Comick has no image API — always external
-      externalUrl: ch.url,
+      type: "readable" as ChapterType, // Proxied via /api/image-proxy — readable in-site
+      externalUrl: undefined,
     }))
     .filter((ch) => !isNaN(ch.chapterNumber));
 }
@@ -111,14 +111,11 @@ function mergeChapterLists(
 
       const existing = grouped.get(num)!;
 
-      // If this is a Comick (external) entry, only add it if no readable
-      // MangaDex version exists for this chapter number. This prevents
-      // cluttering the list with external duplicates.
-      if (entry.type === "external" && entry.source !== "mangadex") {
-        const hasReadableMd = existing.some(
-          (e) => e.source === "mangadex" && e.type === "readable"
-        );
-        if (hasReadableMd) continue; // Skip — MD already covers this chapter
+      // If this is an external entry (e.g. MangaPlus on MangaDex), skip it
+      // if a readable version already exists for this chapter number.
+      if (entry.type === "external") {
+        const hasReadable = existing.some((e) => e.type === "readable");
+        if (hasReadable) continue;
       }
 
       // Deduplicate: don't add if same source + same scanlator already exists

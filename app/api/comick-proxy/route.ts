@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Whitelist of allowed endpoints
-    const allowed = ["/api/search", "/api/chapters", "/api/frontpage", "/api/sources", "/api/health"];
+    const allowed = ["/api/search", "/api/chapters", "/api/pages", "/api/frontpage", "/api/sources", "/api/health"];
     if (!allowed.includes(endpoint)) {
       return NextResponse.json(
         { error: "Endpoint not allowed" },

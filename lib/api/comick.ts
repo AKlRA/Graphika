@@ -203,8 +203,57 @@ export async function comickTrending(
   }
 }
 
-// comickPages() removed — the Comick proxy has no /api/pages endpoint.
-// Comick is used only for chapter discovery (metadata), not for reading.
+// ── Pages (chapter images) ──
+
+export interface ComickPagesResponse {
+  pages?: string[];
+  images?: string[];
+  count?: number;
+  [key: string]: unknown;
+}
+
+/**
+ * Fetch the image URLs for a given chapter.
+ * Uses our own /api/chapter-pages scraper (NOT the upstream Comick API,
+ * which has no pages endpoint). The scraper fetches the source site HTML
+ * and extracts image URLs server-side.
+ */
+export async function comickPages(
+  url: string,
+  source?: string
+): Promise<string[]> {
+  try {
+    const body: Record<string, unknown> = { url };
+    if (source) body.source = source;
+
+    // Call our own scraper endpoint directly (not through comick-proxy)
+    const res = await fetch("/api/chapter-pages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      throw new Error(`Chapter pages scraper error: ${res.status}`);
+    }
+
+    const data: ComickPagesResponse = await res.json();
+    return data.pages || data.images || [];
+  } catch (err) {
+    console.error(`Comick pages failed (url=${url}, source=${source}):`, err);
+    return [];
+  }
+}
+
+/**
+ * Wrap a raw image URL through our image proxy to bypass CORS/403.
+ * The source hint tells the proxy which Referer to spoof.
+ */
+export function buildProxiedImageUrl(rawUrl: string, source?: string): string {
+  const params = new URLSearchParams({ url: rawUrl });
+  if (source) params.set("source", source);
+  return `/api/image-proxy?${params.toString()}`;
+}
 
 
 // ── Available Sources ──
