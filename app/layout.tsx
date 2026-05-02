@@ -28,6 +28,17 @@ export const metadata: Metadata = {
   description:
     "A premium manga, manhwa, and manhua reader. Read your favorites from multiple sources, beautifully.",
   keywords: ["manga", "manhwa", "manhua", "reader", "graphika"],
+  icons: [
+    {
+      rel: "icon",
+      url: "/graphika-mark.svg",
+      type: "image/svg+xml",
+    },
+    {
+      rel: "apple-touch-icon",
+      url: "/graphika-mark.svg",
+    },
+  ],
 };
 
 export const viewport: Viewport = {

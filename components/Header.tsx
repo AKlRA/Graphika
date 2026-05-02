@@ -37,9 +37,9 @@ export default function Header() {
       <div className="flex items-center justify-between h-14 px-4 max-w-7xl mx-auto">
         <Link href="/" className="flex items-center gap-2">
           <Image
-            src="/logo.png"
-            width={32}
-            height={32}
+            src="/graphika-mark.svg"
+            width={48}
+            height={48}
             className="rounded-md object-cover"
             alt="Graphika Logo"
           />

@@ -67,6 +67,9 @@ Refresh Graphika with a mobile-first editorial dark theme inspired by Journey Di
 | `app/library/page.tsx` | Rethemed empty state, sort pills, and remove sheet |
 | `app/manga/[id]/page.tsx` | Rethemed detail CTAs and badges |
 | `app/manga/[id]/read/page.tsx` | Rethemed reader controls and settings |
+| `public/graphika-mark.svg` | New Graphika mark used in the header and browser icon metadata |
+| `public/graphika-logo.svg` | Full logo artwork matching the supplied reference |
+| `app/icon.svg` | Next app icon version of the new mark |
 
 ## Notes
 
