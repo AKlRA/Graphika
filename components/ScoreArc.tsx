@@ -42,7 +42,7 @@ export default function ScoreArc({ score, size = 56, strokeWidth = 4 }: ScoreArc
           strokeDashoffset={circumference - progress}
           style={{
             transition: "stroke-dashoffset 1s ease-out",
-            filter: "drop-shadow(0 0 6px rgba(34, 211, 238, 0.4))",
+            filter: "drop-shadow(0 0 6px rgba(159, 231, 215, 0.32))",
           }}
         />
       </svg>

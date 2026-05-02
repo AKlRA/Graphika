@@ -4,12 +4,14 @@
 
 // ── Preferred sources (operational, good coverage) ──
 export const PREFERRED_SOURCES = [
+  "mangakatana",
+  "mangakakalot",
+  "manganato",
   "comix",
   "asurascans",
   "flamecomics",
-  "mangakatana",
-  "weebcentral",
   "mangacloud",
+  "weebcentral",
 ] as const;
 
 // ── Types ──
@@ -147,7 +149,13 @@ export async function comickSearch(
  */
 export async function comickSearchMultiSource(
   query: string,
-  sources: string[] = ["comix", "mangakatana", "weebcentral"]
+  sources: string[] = [
+    "mangakatana",
+    "mangakakalot",
+    "manganato",
+    "comix",
+    "weebcentral",
+  ]
 ): Promise<{ results: ComickManga[]; source: string }[]> {
   const promises = sources.map(async (source) => {
     try {

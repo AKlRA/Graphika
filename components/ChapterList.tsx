@@ -1,18 +1,19 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Layers, ChevronDown, ArrowUpDown, ExternalLink, Search } from "lucide-react";
-import { type ChapterGroup, type ChapterSource } from "@/lib/chapters";
-import { getProgress, getItem, setItem, type ReadingProgress } from "@/lib/storage";
+import { Layers, ArrowUpDown, ExternalLink, Search } from "lucide-react";
+import { type ChapterGroup } from "@/lib/chapters";
+import { type ReadingProgress } from "@/lib/storage";
 import BottomSheet from "./BottomSheet";
 
 interface ChapterListProps {
   groups: ChapterGroup[];
   allScanlators: string[];
-  anilistId: number;
   onChapterSelect: (group: ChapterGroup) => void;
   readProgress: ReadingProgress | null;
+  /** Chapter numbers opened from this list or reader (dims rows). */
+  touchedChapters: Set<number>;
 }
 
 type SourceFilter = "all" | "mangadex" | "comix";
@@ -38,34 +39,23 @@ function formatDate(dateStr: string): string {
 export default function ChapterList({
   groups,
   allScanlators,
-  anilistId,
   onChapterSelect,
   readProgress,
+  touchedChapters,
 }: ChapterListProps) {
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [scanlatorFilter, setScanlatorFilter] = useState<string>("all");
   const [sortAsc, setSortAsc] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerGroup, setPickerGroup] = useState<ChapterGroup | null>(null);
-  const [tooltipSeen, setTooltipSeen] = useState(true); // default true to avoid flash
-
-  useEffect(() => {
-    const seen = getItem<boolean>("settings:externalLinkTooltipSeen", false);
-    setTooltipSeen(seen);
-  }, []);
-
-  const dismissTooltip = () => {
-    setTooltipSeen(true);
-    setItem("settings:externalLinkTooltipSeen", true);
-  };
-
-  // Track if we've shown the tooltip on one row already
-  let tooltipRendered = false;
-
   const containerRef = useRef<HTMLDivElement>(null);
   const [jumpInput, setJumpInput] = useState("");
 
   const lastReadChapter = readProgress?.chapter ?? -1;
+
+  const chapterVisited = (ch: number) =>
+    touchedChapters.has(ch) ||
+    (lastReadChapter >= 0 && ch <= lastReadChapter + 1e-6);
 
   const filteredGroups = useMemo(() => {
     let result = groups;
@@ -99,9 +89,9 @@ export default function ChapterList({
   }, [groups, sourceFilter, scanlatorFilter, sortAsc]);
 
   const sourceTabStyle = (active: boolean) => ({
-    background: active ? "rgba(124, 111, 247, 0.15)" : "transparent",
+    background: active ? "rgba(214, 255, 77, 0.12)" : "transparent",
     color: active ? "var(--accent-violet)" : "var(--text-muted)",
-    border: active ? "1px solid rgba(124, 111, 247, 0.3)" : "1px solid transparent",
+    border: active ? "1px solid rgba(214, 255, 77, 0.24)" : "1px solid transparent",
   });
 
   return (
@@ -111,7 +101,7 @@ export default function ChapterList({
         <div
           className="sticky top-0 z-10 px-4 py-3 flex flex-col gap-2"
           style={{
-            background: "rgba(15, 15, 26, 0.95)",
+            background: "rgba(5, 5, 4, 0.94)",
             backdropFilter: "blur(12px)",
             borderBottom: "1px solid var(--border-subtle)",
           }}
@@ -137,11 +127,10 @@ export default function ChapterList({
                 <select
                   value={scanlatorFilter}
                   onChange={(e) => setScanlatorFilter(e.target.value)}
-                  className="appearance-none pl-3 pr-7 py-1.5 rounded-full text-xs font-medium bg-transparent cursor-pointer"
+                  className="pl-3 pr-8 py-1.5 text-xs font-medium cursor-pointer"
                   style={{
                     color: "var(--text-secondary)",
-                    border: "1px solid var(--border-default)",
-                    background: "rgba(255, 255, 255, 0.04)",
+                    backgroundColor: "rgba(243, 240, 230, 0.055)",
                   }}
                 >
                   <option value="all">All Groups</option>
@@ -151,10 +140,6 @@ export default function ChapterList({
                     </option>
                   ))}
                 </select>
-                <ChevronDown
-                  size={12}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none"
-                />
               </div>
             )}
 
@@ -209,9 +194,12 @@ export default function ChapterList({
           {filteredGroups.map((group) => {
             const active = group.activeVersion;
             const isExternal = active.type === "external";
-            const isRead = group.chapterNumber <= lastReadChapter;
-            const isCurrent = Math.abs(group.chapterNumber - lastReadChapter) < 0.01;
-            const isNew = !isRead && !isExternal && group.chapterNumber > lastReadChapter;
+            const isVisited = chapterVisited(group.chapterNumber);
+            const isCurrent =
+              lastReadChapter >= 0 &&
+              Math.abs(group.chapterNumber - lastReadChapter) < 0.01;
+            const isNew =
+              !isVisited && !isExternal && group.chapterNumber > lastReadChapter + 1e-6;
             const hasMultiple = group.versions.length > 1;
 
             return (
@@ -220,13 +208,15 @@ export default function ChapterList({
                 data-chapter={group.chapterNumber}
                 className="w-full flex items-center gap-3 px-4 min-h-[56px] transition-all duration-200 text-left"
                 style={{
-                  opacity: isExternal ? 0.6 : 1,
+                  opacity: isVisited && !isCurrent ? 0.45 : isExternal ? 0.72 : 1,
                   borderLeft: isCurrent
                     ? "2px solid var(--accent-violet)"
                     : "2px solid transparent",
                   background: isCurrent
-                    ? "rgba(124, 111, 247, 0.06)"
-                    : "transparent",
+                    ? "rgba(214, 255, 77, 0.06)"
+                    : isVisited
+                      ? "rgba(255,255,255,0.02)"
+                      : "transparent",
                 }}
                 whileHover={
                   isExternal
@@ -234,13 +224,10 @@ export default function ChapterList({
                     : { scale: 1.01, x: 4, backgroundColor: "rgba(255, 255, 255, 0.04)" }
                 }
                 onClick={() => {
-                  if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10);
-                  if (isExternal && active.externalUrl) {
-                    if (!tooltipSeen) dismissTooltip();
-                    window.open(active.externalUrl, '_blank', 'noopener,noreferrer');
-                  } else {
-                    onChapterSelect(group);
+                  if (typeof navigator !== "undefined" && navigator.vibrate) {
+                    navigator.vibrate(10);
                   }
+                  onChapterSelect(group);
                 }}
                 whileTap={{ scale: 0.98 }}
               >
@@ -249,12 +236,12 @@ export default function ChapterList({
                   <ExternalLink
                     size={14}
                     className="flex-shrink-0"
-                    style={{ color: "#D4A017" }}
+                    style={{ color: isVisited ? "var(--text-muted)" : "#D4A017" }}
                   />
                 ) : isNew && !isCurrent ? (
                   <div
                     className="w-2 h-2 rounded-full flex-shrink-0"
-                    style={{ background: "var(--accent-cyan)", boxShadow: "0 0 6px rgba(34, 211, 238, 0.5)" }}
+                    style={{ background: "var(--accent-cyan)", boxShadow: "0 0 6px rgba(159, 231, 215, 0.36)" }}
                   />
                 ) : (
                   <div className="w-2 flex-shrink-0" />
@@ -265,14 +252,20 @@ export default function ChapterList({
                   className="text-sm font-semibold flex-shrink-0 w-14 transition-colors"
                   style={{
                     fontFamily: "var(--font-mono)",
-                    color: isCurrent ? "var(--accent-violet)" : isExternal ? "var(--text-muted)" : isRead ? "var(--text-muted)" : "var(--text-primary)",
+                    color: isCurrent
+                      ? "var(--accent-violet)"
+                      : isVisited
+                        ? "var(--text-muted)"
+                        : "var(--text-primary)",
                   }}
                 >
                   {group.chapterString}
                 </span>
 
                 {/* Scanlator + title */}
-                <div className={`flex-1 min-w-0 transition-opacity ${isRead && !isCurrent ? "opacity-50" : "opacity-100"}`}>
+                <div
+                  className={`flex-1 min-w-0 transition-opacity ${isVisited && !isCurrent ? "opacity-55" : "opacity-100"}`}
+                >
                   <p className="text-xs text-text-secondary truncate">
                     {active.scanlationGroup}
                   </p>
@@ -281,17 +274,6 @@ export default function ChapterList({
                       {active.title}
                     </p>
                   )}
-                  {isExternal && (() => {
-                    const showTooltip = !tooltipSeen && !tooltipRendered;
-                    if (showTooltip) tooltipRendered = true;
-                    return (
-                      <p className="text-[10px] mt-0.5" style={{ color: "#D4A017" }}>
-                        {showTooltip
-                          ? "Opens in your default browser"
-                          : "Opens in browser"}
-                      </p>
-                    );
-                  })()}
                 </div>
 
                 {/* Source badge */}
@@ -363,11 +345,11 @@ export default function ChapterList({
                 style={{
                   background:
                     version === pickerGroup.activeVersion
-                      ? "rgba(108,99,255,0.1)"
+                      ? "rgba(214,255,77,0.1)"
                       : "rgba(255,255,255,0.03)",
                   border:
                     version === pickerGroup.activeVersion
-                      ? "1px solid rgba(108,99,255,0.3)"
+                      ? "1px solid rgba(214,255,77,0.28)"
                       : "1px solid rgba(255,255,255,0.06)",
                 }}
                 onClick={() => {
@@ -392,7 +374,7 @@ export default function ChapterList({
                   </p>
                 </div>
                 {version === pickerGroup.activeVersion && (
-                  <span className="text-[10px] font-bold" style={{ color: "#6C63FF" }}>
+                  <span className="text-[10px] font-bold" style={{ color: "var(--accent-violet)" }}>
                     ACTIVE
                   </span>
                 )}

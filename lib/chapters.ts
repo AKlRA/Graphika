@@ -9,6 +9,13 @@ import { comickChapters, type ComickChapter } from "./api/comick";
 import { getItem, setItem } from "./storage";
 import type { ScanlatorPrefs } from "./storage";
 
+type IdLinkFields = {
+  v?: number;
+  mangadexId?: string;
+  comixUrl?: string;
+  comixSource?: string;
+};
+
 // ── Types ──
 
 export type ChapterSource = string;
@@ -40,6 +47,18 @@ export interface CachedChapterData {
   data: ChapterGroup[];
   allScanlators: string[];
   cachedAt: number;
+  /** When this matches current linked IDs, a fresh chapter list cache can be trusted. */
+  idsFingerprint?: string;
+}
+
+/** Fingerprint of linkage + scanlator prefs when the chapter list was built. */
+export function chapterIdsFingerprint(
+  ids: IdLinkFields,
+  scanlatorPrefs?: ScanlatorPrefs
+): string {
+  const p1 = scanlatorPrefs?.p1 ?? "";
+  const p2 = scanlatorPrefs?.p2 ?? "";
+  return `${ids.v ?? 0}|${ids.mangadexId ?? ""}|${ids.comixUrl ?? ""}|${ids.comixSource ?? ""}|${p1}|${p2}`;
 }
 
 // ── Normalization ──
@@ -73,25 +92,41 @@ function normalizeMangaDexChapters(
     .filter((ch) => !isNaN(ch.chapterNumber));
 }
 
+/** MangaPlus is canvas/encrypted — not HTML-scrapable; open in browser. */
+function isMangaPlusChapter(source: string, chapterUrl: string): boolean {
+  const s = source.toLowerCase();
+  if (s === "mangaplus" || s === "manga_plus") return true;
+  try {
+    const h = new URL(chapterUrl).hostname.toLowerCase();
+    return h.includes("mangaplus");
+  } catch {
+    return false;
+  }
+}
+
 function normalizeComickChapters(
   chapters: ComickChapter[],
   source: string
 ): ChapterEntry[] {
   return chapters
     .filter((ch) => ch.number !== null && ch.number !== undefined)
-    .map((ch) => ({
-      chapterNumber: typeof ch.number === "string" ? parseFloat(ch.number) : ch.number,
-      chapterString: String(ch.number),
-      title: ch.title || null,
-      source: source as ChapterSource,
-      scanlationGroup: source.charAt(0).toUpperCase() + source.slice(1),
-      chapterId: ch.url,
-      sourceUrl: ch.url,
-      uploadedAt: ch.date || "",
-      pageCount: undefined,
-      type: "readable" as ChapterType, // Proxied via /api/image-proxy — readable in-site
-      externalUrl: undefined,
-    }))
+    .map((ch) => {
+      const plus = isMangaPlusChapter(source, ch.url);
+      return {
+        chapterNumber:
+          typeof ch.number === "string" ? parseFloat(ch.number) : ch.number,
+        chapterString: String(ch.number),
+        title: ch.title || null,
+        source: source as ChapterSource,
+        scanlationGroup: source.charAt(0).toUpperCase() + source.slice(1),
+        chapterId: ch.url,
+        sourceUrl: ch.url,
+        uploadedAt: ch.date || "",
+        pageCount: undefined,
+        type: (plus ? "external" : "readable") as ChapterType,
+        externalUrl: plus ? ch.url : undefined,
+      };
+    })
     .filter((ch) => !isNaN(ch.chapterNumber));
 }
 
@@ -135,6 +170,25 @@ function mergeChapterLists(
 
 // ── Version Resolution ──
 
+/** Lower rank = preferred default when multiple hosts have the same chapter. */
+function comickSourcePriorityRank(source: string): number {
+  const order = [
+    "mangadex",
+    "mangakatana",
+    "mangakakalot",
+    "manganato",
+    "comix",
+    "asurascans",
+    "flamecomics",
+    "mangacloud",
+    "weebcentral",
+    "mangapill",
+    "mangaplus",
+  ];
+  const idx = order.indexOf(source.toLowerCase());
+  return idx === -1 ? 50 : idx;
+}
+
 function resolveActiveVersion(
   versions: ChapterEntry[],
   prefs: ScanlatorPrefs
@@ -155,14 +209,18 @@ function resolveActiveVersion(
     if (p2Match) return p2Match;
   }
 
-  // Prefer MangaDex over Comick
-  const mdVersion = versions.find((v) => v.source === "mangadex");
-  if (mdVersion) return mdVersion;
+  // Prefer any in-site readable host over external-only, then source priority, then recency
+  const readables = versions.filter((v) => v.type === "readable");
+  const pool = readables.length > 0 ? readables : versions;
 
-  // Most recent upload
-  const sorted = [...versions].sort(
-    (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
-  );
+  const sorted = [...pool].sort((a, b) => {
+    const rankDiff =
+      comickSourcePriorityRank(a.source) - comickSourcePriorityRank(b.source);
+    if (rankDiff !== 0) return rankDiff;
+    return (
+      new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+    );
+  });
   return sorted[0];
 }
 
@@ -235,7 +293,7 @@ export async function aggregateChapters(
 
 // ── Caching ──
 
-const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+export const CHAPTER_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
 export function getCachedChapters(anilistId: number): CachedChapterData | null {
   const cached = getItem<CachedChapterData | null>(`manga:${anilistId}:chapters`, null);
@@ -245,12 +303,14 @@ export function getCachedChapters(anilistId: number): CachedChapterData | null {
 export function setCachedChapters(
   anilistId: number,
   data: ChapterGroup[],
-  allScanlators: string[]
+  allScanlators: string[],
+  idsFingerprint?: string
 ): void {
   const cacheData: CachedChapterData = {
     data,
     allScanlators,
     cachedAt: Date.now(),
+    ...(idsFingerprint !== undefined ? { idsFingerprint } : {}),
   };
   setItem(`manga:${anilistId}:chapters`, cacheData);
 }

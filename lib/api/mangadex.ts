@@ -57,17 +57,21 @@ export interface MangaDexAtHome {
  */
 export async function searchMangaDex(
   title: string,
-  limit = 5
+  limit = 20,
+  options?: { requireEn?: boolean }
 ): Promise<MangaDexManga[]> {
   const params = new URLSearchParams({
     title,
-    "availableTranslatedLanguage[]": "en",
     limit: String(limit),
     "contentRating[]": "safe",
   });
-  // Add additional content ratings
   params.append("contentRating[]", "suggestive");
   params.append("contentRating[]", "erotica");
+  params.append("contentRating[]", "pornographic");
+
+  if (options?.requireEn !== false) {
+    params.append("availableTranslatedLanguage[]", "en");
+  }
 
   const res = await rateLimitedFetch(`${MANGADEX_BASE}/manga?${params}`);
   if (!res.ok) throw new Error(`MangaDex search error: ${res.status}`);
@@ -91,8 +95,9 @@ export function confirmAniListLink(
  * Fetch all EN chapters for a MangaDex manga UUID, with scanlation groups included.
  * Handles pagination (max 500 per request).
  */
-export async function fetchMangaDexChapters(
-  mangadexId: string
+async function fetchMangaDexFeedPaged(
+  mangadexId: string,
+  translatedLanguage: string
 ): Promise<MangaDexChapter[]> {
   const allChapters: MangaDexChapter[] = [];
   let offset = 0;
@@ -100,7 +105,7 @@ export async function fetchMangaDexChapters(
 
   while (true) {
     const params = new URLSearchParams({
-      "translatedLanguage[]": "en",
+      "translatedLanguage[]": translatedLanguage,
       limit: String(limit),
       offset: String(offset),
       "includes[]": "scanlation_group",
@@ -109,6 +114,7 @@ export async function fetchMangaDexChapters(
     });
     params.append("contentRating[]", "suggestive");
     params.append("contentRating[]", "erotica");
+    params.append("contentRating[]", "pornographic");
 
     const res = await rateLimitedFetch(
       `${MANGADEX_BASE}/manga/${mangadexId}/feed?${params}`
@@ -123,6 +129,17 @@ export async function fetchMangaDexChapters(
   }
 
   return allChapters;
+}
+
+/**
+ * Fetch chapters: English first, then Japanese if the series has no EN uploads.
+ */
+export async function fetchMangaDexChapters(
+  mangadexId: string
+): Promise<MangaDexChapter[]> {
+  const en = await fetchMangaDexFeedPaged(mangadexId, "en");
+  if (en.length > 0) return en;
+  return fetchMangaDexFeedPaged(mangadexId, "ja");
 }
 
 /**

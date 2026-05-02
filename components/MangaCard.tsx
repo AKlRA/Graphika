@@ -31,7 +31,7 @@ export default function MangaCard({ media, index = 0, variant = "portrait", prog
       >
         <Link href={`/manga/${media.id}`} className="block w-[140px]">
           <motion.div
-            className="relative overflow-hidden rounded-xl"
+            className="relative overflow-hidden rounded-lg"
             style={{ aspectRatio: "3/4" }}
             whileHover={{ y: -6, scale: 1.03 }}
             whileTap={{ scale: 0.96 }}
@@ -48,7 +48,7 @@ export default function MangaCard({ media, index = 0, variant = "portrait", prog
             <div
               className="absolute inset-0"
               style={{
-                background: "linear-gradient(to top, rgba(8,8,14,0.9) 0%, transparent 50%)",
+                background: "linear-gradient(to top, rgba(5,5,4,0.92) 0%, transparent 55%)",
               }}
             />
             {/* Info */}
@@ -90,7 +90,7 @@ export default function MangaCard({ media, index = 0, variant = "portrait", prog
     >
       <Link href={`/manga/${media.id}`} className="block w-[140px]">
           <motion.div
-            className="relative overflow-hidden rounded-xl group"
+            className="relative overflow-hidden rounded-lg group"
             style={{ aspectRatio: "3/4" }}
             whileHover={{ y: -6, scale: 1.03 }}
             whileTap={{ scale: 0.96 }}
@@ -107,7 +107,7 @@ export default function MangaCard({ media, index = 0, variant = "portrait", prog
           <div
             className="absolute inset-0"
             style={{
-              background: "linear-gradient(to top, rgba(8,8,14,0.9) 0%, transparent 50%)",
+              background: "linear-gradient(to top, rgba(5,5,4,0.92) 0%, transparent 55%)",
             }}
           />
           {/* Type badge */}
@@ -117,11 +117,11 @@ export default function MangaCard({ media, index = 0, variant = "portrait", prog
               <div
                 className="flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold"
                 style={{
-                  background: "rgba(15, 15, 26, 0.7)",
+                  background: "rgba(5, 5, 4, 0.72)",
                   color: "var(--accent-cyan)",
                   backdropFilter: "blur(12px)",
                   WebkitBackdropFilter: "blur(12px)",
-                  border: "1px solid rgba(34, 211, 238, 0.3)",
+                  border: "1px solid rgba(159, 231, 215, 0.28)",
                 }}
               >
                 ★
@@ -133,10 +133,10 @@ export default function MangaCard({ media, index = 0, variant = "portrait", prog
               style={{
                 background:
                   type === "MANHWA"
-                    ? "rgba(34, 211, 238, 0.2)"
+                    ? "rgba(159, 231, 215, 0.16)"
                     : type === "MANHUA"
-                      ? "rgba(240, 98, 146, 0.2)"
-                      : "rgba(124, 111, 247, 0.2)",
+                      ? "rgba(240, 216, 168, 0.16)"
+                      : "rgba(214, 255, 77, 0.14)",
                 color:
                   type === "MANHWA"
                     ? "var(--accent-cyan)"

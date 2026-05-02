@@ -52,11 +52,11 @@ export default function BottomSheet({ isOpen, onClose, title, children }: Bottom
           {/* Mobile: bottom sheet */}
           <motion.div
             ref={sheetRef}
-            className="fixed z-[70] md:hidden bottom-0 left-0 right-0 max-h-[85vh] overflow-y-auto"
+            className="fixed z-[70] md:hidden bottom-0 left-0 right-0 max-h-[85vh] overflow-hidden"
             style={{
-              background: "var(--bg-surface)",
-              borderTopLeftRadius: 20,
-              borderTopRightRadius: 20,
+              background: "rgba(12,12,10,0.98)",
+              borderTopLeftRadius: 12,
+              borderTopRightRadius: 12,
               border: "1px solid var(--border-default)",
               borderBottom: "none",
             }}
@@ -100,10 +100,10 @@ export default function BottomSheet({ isOpen, onClose, title, children }: Bottom
             className="fixed z-[70] hidden md:flex items-center justify-center inset-0 pointer-events-none"
           >
             <motion.div
-              className="pointer-events-auto max-w-md w-full max-h-[70vh] overflow-y-auto"
+              className="pointer-events-auto max-w-md w-full max-h-[70vh] overflow-hidden"
               style={{
-                background: "var(--bg-surface)",
-                borderRadius: 20,
+                background: "rgba(12,12,10,0.98)",
+                borderRadius: 8,
                 border: "1px solid var(--border-default)",
               }}
               initial={{ opacity: 0, scale: 0.95, y: 10 }}

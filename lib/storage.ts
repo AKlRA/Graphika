@@ -71,6 +71,20 @@ export function setProgress(anilistId: number, progress: ReadingProgress): void 
   setItem(`manga:${anilistId}:progress`, progress);
 }
 
+/** Chapter numbers the user opened (list tap or reader); dims rows alongside reading progress. */
+export function getTouchedChapters(anilistId: number): number[] {
+  return getItem<number[]>(`manga:${anilistId}:touched`, []);
+}
+
+export function touchChapter(anilistId: number, chapterNumber: number): void {
+  const raw = [...getTouchedChapters(anilistId)];
+  const exists = raw.some((x) => Math.abs(x - chapterNumber) < 1e-6);
+  if (!exists) {
+    raw.push(chapterNumber);
+    setItem(`manga:${anilistId}:touched`, raw);
+  }
+}
+
 export function getLibrary(): number[] {
   return getItem<number[]>("library", []);
 }

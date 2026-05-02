@@ -7,9 +7,9 @@ export default function Footer() {
   return (
     <footer className="fixed bottom-20 md:bottom-6 right-4 z-40 opacity-80 select-none flex flex-col items-end pointer-events-none">
       <div
-        className="flex items-center gap-1.5 text-[10px] font-medium px-3 py-2 rounded-full pointer-events-auto shadow-lg"
+        className="flex items-center gap-1.5 text-[10px] font-medium px-3 py-2 rounded-md pointer-events-auto shadow-lg"
         style={{
-          background: "var(--bg-surface)",
+          background: "rgba(12,12,10,0.84)",
           border: "1px solid var(--border-default)",
           color: "var(--text-secondary)"
         }}

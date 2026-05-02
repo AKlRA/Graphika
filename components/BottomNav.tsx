@@ -26,7 +26,7 @@ export default function BottomNav() {
       <nav
         className="fixed bottom-0 left-0 right-0 z-50 md:hidden safe-bottom"
         style={{
-          background: "var(--glass-bg)",
+          background: "rgba(5,5,4,0.88)",
           backdropFilter: "var(--glass-blur)",
           WebkitBackdropFilter: "var(--glass-blur)",
           borderTop: "1px solid var(--border-subtle)",
@@ -41,10 +41,16 @@ export default function BottomNav() {
                 key={item.href}
                 href={item.href}
                 onClick={() => typeof navigator !== 'undefined' && navigator.vibrate?.(10)}
-                className="relative flex flex-col items-center justify-center gap-1 min-w-[44px] min-h-[44px]"
+                className="relative flex items-center justify-center"
               >
                 <motion.div
-                  className="relative flex flex-col items-center"
+                  className="relative flex h-14 w-16 flex-col items-center justify-center gap-1 rounded-lg transition-all duration-200"
+                  style={{
+                    background: isActive ? "rgba(214, 255, 77, 0.10)" : "transparent",
+                    border: isActive ? "1px solid rgba(214, 255, 77, 0.22)" : "1px solid transparent",
+                    backdropFilter: isActive ? "blur(14px)" : "none",
+                    boxShadow: isActive ? "inset 0 1px 0 rgba(243,240,230,0.10), 0 8px 24px rgba(0,0,0,0.22)" : "none",
+                  }}
                   whileTap={{ scale: 0.9 }}
                 >
                   <Icon
@@ -54,17 +60,6 @@ export default function BottomNav() {
                       color: isActive ? "var(--accent-violet)" : "var(--text-muted)",
                     }}
                   />
-                  {isActive && (
-                    <motion.div
-                      layoutId="nav-glow"
-                      className="absolute -bottom-1 w-5 h-0.5 rounded-full"
-                      style={{
-                        background: "var(--accent-violet)",
-                        boxShadow: "0 0 12px var(--accent-violet)",
-                      }}
-                      transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                    />
-                  )}
                   <span
                     className="text-[10px] mt-1 font-medium transition-colors duration-200"
                     style={{ color: isActive ? "var(--accent-violet)" : "var(--text-muted)" }}
@@ -95,9 +90,12 @@ export default function BottomNav() {
             <Link
               key={item.href}
               href={item.href}
-              className="relative flex flex-col items-center justify-center gap-1 min-w-[44px] min-h-[44px] rounded-xl transition-all duration-200"
+              className="relative flex h-16 w-16 flex-col items-center justify-center gap-1 rounded-lg transition-all duration-200"
               style={{
-                background: isActive ? "rgba(124, 111, 247, 0.1)" : "transparent",
+                background: isActive ? "rgba(214, 255, 77, 0.10)" : "transparent",
+                border: isActive ? "1px solid rgba(214, 255, 77, 0.22)" : "1px solid transparent",
+                backdropFilter: isActive ? "blur(14px)" : "none",
+                boxShadow: isActive ? "inset 0 1px 0 rgba(243,240,230,0.10), 0 10px 28px rgba(0,0,0,0.22)" : "none",
               }}
             >
               <Icon

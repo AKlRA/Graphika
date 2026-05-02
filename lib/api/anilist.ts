@@ -65,6 +65,84 @@ query ($search: String, $page: Int, $perPage: Int) {
   }
 }`;
 
+const ADVANCED_SEARCH_QUERY = `
+query (
+  $search: String,
+  $genres: [String],
+  $status: MediaStatus,
+  $chaptersGreater: Int,
+  $chaptersLess: Int,
+  $sort: [MediaSort],
+  $page: Int,
+  $perPage: Int,
+  $countryOfOrigin: CountryCode
+) {
+  Page(page: $page, perPage: $perPage) {
+    pageInfo {
+      total
+      currentPage
+      lastPage
+      perPage
+      hasNextPage
+    }
+    media(
+      search: $search,
+      type: MANGA,
+      isAdult: false,
+      genre_in: $genres,
+      status: $status,
+      chapters_greater: $chaptersGreater,
+      chapters_lesser: $chaptersLess,
+      sort: $sort,
+      countryOfOrigin: $countryOfOrigin
+    ) {
+      id
+      title { romaji english native }
+      description
+      genres
+      averageScore
+      status
+      format
+      chapters
+      countryOfOrigin
+      coverImage { extraLarge large color }
+      bannerImage
+      type
+    }
+  }
+}`;
+
+// Filter types
+export type MediaStatus = "FINISHED" | "RELEASING" | "NOT_YET_RELEASED" | "CANCELLED";
+export type MediaSort = "TRENDING_DESC" | "UPDATED_AT_DESC" | "CHAPTERS_DESC" | "SCORE_DESC" | "POPULARITY_DESC";
+/** AniList country: Japan = typical manga, Korea = manhwa, China/Taiwan = manhua. */
+export type MangaOriginFilter = "JP" | "KR" | "CN" | "TW";
+
+export interface SearchPageInfo {
+  total: number;
+  currentPage: number;
+  lastPage: number;
+  perPage: number;
+  hasNextPage: boolean;
+}
+
+export interface AdvancedSearchFilters {
+  search?: string;
+  genres?: string[];
+  status?: MediaStatus;
+  chaptersGreater?: number;
+  chaptersLess?: number;
+  sort?: MediaSort[];
+  page?: number;
+  perPage?: number;
+  countryOfOrigin?: MangaOriginFilter;
+}
+
+export interface AdvancedSearchPageResult {
+  media: AniListMedia[];
+  pageInfo: SearchPageInfo;
+}
+
 async function anilistFetch(query: string, variables: Record<string, unknown>): Promise<unknown> {
   const res = await fetch(ANILIST_URL, {
     method: "POST",
@@ -73,6 +151,10 @@ async function anilistFetch(query: string, variables: Record<string, unknown>): 
   });
   if (!res.ok) throw new Error(`AniList error: ${res.status}`);
   const json = await res.json();
+  if (json.errors) {
+    console.error("GraphQL errors:", json.errors);
+    throw new Error(`AniList GraphQL error: ${json.errors[0]?.message}`);
+  }
   return json.data;
 }
 
@@ -125,6 +207,53 @@ export async function searchManga(
     Page: { media: AniListMedia[] };
   };
   return data.Page.media;
+}
+
+export async function searchMangaAdvanced(
+  filters: AdvancedSearchFilters
+): Promise<AdvancedSearchPageResult> {
+  const {
+    search,
+    genres,
+    status,
+    chaptersGreater,
+    chaptersLess,
+    sort = ["UPDATED_AT_DESC"],
+    page = 1,
+    perPage = 35,
+    countryOfOrigin,
+  } = filters;
+
+  const variables: Record<string, unknown> = {
+    page,
+    perPage,
+    sort,
+  };
+
+  if (search) variables.search = search;
+  if (genres && genres.length > 0) variables.genres = genres;
+  if (status) variables.status = status;
+  if (chaptersGreater !== undefined) variables.chaptersGreater = chaptersGreater;
+  if (chaptersLess !== undefined) variables.chaptersLess = chaptersLess;
+  if (countryOfOrigin) variables.countryOfOrigin = countryOfOrigin;
+
+  const data = (await anilistFetch(ADVANCED_SEARCH_QUERY, variables)) as {
+    Page: {
+      media: AniListMedia[];
+      pageInfo: SearchPageInfo;
+    };
+  };
+  const pg = data.Page;
+  return {
+    media: pg.media,
+    pageInfo: pg.pageInfo ?? {
+      total: pg.media.length,
+      currentPage: page,
+      lastPage: page,
+      perPage,
+      hasNextPage: false,
+    },
+  };
 }
 
 const IDS_QUERY = `

@@ -108,13 +108,24 @@ export async function linkMangaDexId(
   confirmed: boolean;
 }> {
   const titlesToTry = buildTitleVariants(titleEnglish, titleRomaji, titleNative, synonyms);
+  const searchPasses: { title: string; requireEn: boolean }[] = [];
+  for (const title of titlesToTry) {
+    searchPasses.push({ title, requireEn: true });
+  }
+  for (const title of titlesToTry) {
+    searchPasses.push({ title, requireEn: false });
+  }
 
-  for (const searchTitle of titlesToTry) {
+  let bestMatch: MangaDexManga | null = null;
+  let bestScore = 0;
+
+  for (const { title: searchTitle, requireEn } of searchPasses) {
     try {
-      const results = await searchMangaDex(searchTitle, 5);
+      const results = await searchMangaDex(searchTitle, 25, {
+        requireEn,
+      });
       if (results.length === 0) continue;
 
-      // First pass: look for confirmed AniList link
       for (const manga of results) {
         if (confirmAniListLink(manga, anilistId)) {
           const mdTitle = getMangaDexTitle(manga);
@@ -126,40 +137,27 @@ export async function linkMangaDexId(
         }
       }
 
-      // Second pass: fuzzy match by title (use all provided titles)
-      let bestMatch: MangaDexManga | null = null;
-      let bestScore = 0;
-
       for (const manga of results) {
         const mdTitle = getMangaDexTitle(manga);
-        for (const title of titlesToTry) {
-          const score = matchScore(title, mdTitle);
+        for (const t of titlesToTry) {
+          const score = matchScore(t, mdTitle);
           if (score > bestScore) {
             bestScore = score;
             bestMatch = manga;
           }
         }
       }
-
-      if (bestMatch && bestScore >= 50) {
-        return {
-          mangadexId: bestMatch.id,
-          mangadexTitle: getMangaDexTitle(bestMatch),
-          confirmed: false,
-        };
-      }
-
-      // Return top result from first successful search
-      if (results.length > 0) {
-        return {
-          mangadexId: results[0].id,
-          mangadexTitle: getMangaDexTitle(results[0]),
-          confirmed: false,
-        };
-      }
     } catch (err) {
       console.error(`MangaDex link failed for "${searchTitle}":`, err);
     }
+  }
+
+  if (bestMatch && bestScore >= 52) {
+    return {
+      mangadexId: bestMatch.id,
+      mangadexTitle: getMangaDexTitle(bestMatch),
+      confirmed: false,
+    };
   }
 
   return { confirmed: false };
@@ -192,7 +190,18 @@ export async function linkComickUrl(
   comixSource?: string;
 }> {
   const titleVariants = buildTitleVariants(titleEnglish, titleRomaji, titleNative, synonyms);
-  const sourcesToTry = ["mangakatana", "weebcentral", "comix", "asurascans"];
+  // After MangaDex: katana → MangaKakalot / Manganato (HTML readers) before generic mirrors (e.g. weebcentral).
+  // No mangapill / mangaplus here — low priority for in-app reading; user can still use other Comick sources below.
+  const sourcesToTry = [
+    "mangakatana",
+    "mangakakalot",
+    "manganato",
+    "comix",
+    "asurascans",
+    "flamecomics",
+    "mangacloud",
+    "weebcentral",
+  ];
   const testedUrls = new Set<string>();
 
   // Search each title variant sequentially — stop early on success
@@ -260,9 +269,9 @@ export async function linkAllSources(
 ): Promise<MangaIds> {
   const cached = getMangaIds(anilistId);
 
-  // Bust cache if v < 3 or if comickFailed and 24 hours have elapsed
+  // Bust cache if v < 6 or if comickFailed and 24 hours have elapsed
   let useCache = false;
-  if (cached.v === 3) {
+  if (cached.v === 6) {
     useCache = true;
     if (cached.comickFailed && cached.cachedAt) {
       const hoursElapsed = (Date.now() - cached.cachedAt) / (1000 * 60 * 60);
@@ -287,7 +296,7 @@ export async function linkAllSources(
     comixSource: ckResult.comixSource,
     comickFailed: !ckResult.comixUrl, // mark failed if no URL found
     cachedAt: Date.now(),
-    v: 3,
+    v: 6,
   };
 
   setMangaIds(anilistId, ids);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, use } from "react";
+import { useEffect, useState, useCallback, useMemo, use } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -23,6 +23,8 @@ import {
 } from "@/lib/api/anilist";
 import {
   aggregateChapters,
+  CHAPTER_CACHE_TTL_MS,
+  chapterIdsFingerprint,
   getCachedChapters,
   setCachedChapters,
   type ChapterGroup,
@@ -34,7 +36,10 @@ import {
   addToLibrary,
   removeFromLibrary,
   getItem,
+  getMangaIds,
   setItem,
+  touchChapter,
+  getTouchedChapters,
   type ScanlatorPrefs,
   type ReadingProgress,
   type MangaIds,
@@ -183,6 +188,12 @@ export default function MangaDetailPage({
   const [readProgress, setReadProgress] = useState<ReadingProgress | null>(null);
   const [scanlatorPrefs, setScanlatorPrefs] = useState<ScanlatorPrefs>({});
   const [ids, setIds] = useState<MangaIds>({});
+  const [touchedRev, setTouchedRev] = useState(0);
+
+  const touchedChapters = useMemo(() => {
+    void touchedRev;
+    return new Set(getTouchedChapters(anilistId));
+  }, [anilistId, touchedRev]);
 
   // Load metadata
   useEffect(() => {
@@ -205,54 +216,70 @@ export default function MangaDetailPage({
     );
   }, [anilistId]);
 
+  useEffect(() => {
+    const sync = () => {
+      setReadProgress(getProgress(anilistId));
+      setTouchedRev((n) => n + 1);
+    };
+    window.addEventListener("focus", sync);
+    return () => window.removeEventListener("focus", sync);
+  }, [anilistId]);
+
   // Load chapters after media is loaded
   useEffect(() => {
     if (!media) return;
 
     async function loadChapters() {
-      setChaptersLoading(true);
-
-      // Check cache first
       const cached = getCachedChapters(anilistId);
-      let isStale = false;
+      const storedIds = getMangaIds(anilistId);
+      const idsFp = chapterIdsFingerprint(storedIds, scanlatorPrefs);
+
       if (cached) {
         setChapters(cached.data);
         setAllScanlators(cached.allScanlators);
-        setChaptersLoading(false);
         const age = Date.now() - cached.cachedAt;
-        if (age < 30 * 60 * 1000) {
+        if (
+          age < CHAPTER_CACHE_TTL_MS &&
+          cached.idsFingerprint !== undefined &&
+          cached.idsFingerprint === idsFp
+        ) {
+          setChaptersLoading(false);
           return;
         }
-        isStale = true;
       }
 
-      if (!isStale) setChaptersLoading(true);
+      setChaptersLoading(true);
+      try {
+        const linkedIds = await linkAllSources(
+          anilistId,
+          media!.title.english,
+          media!.title.romaji,
+          media!.title.native,
+          media!.synonyms || []
+        );
+        setIds(linkedIds);
 
-      // Link sources
-      const linkedIds = await linkAllSources(
-        anilistId,
-        media!.title.english,
-        media!.title.romaji,
-        media!.title.native,
-        media!.synonyms || []
-      );
-      setIds(linkedIds);
+        const result = await aggregateChapters(
+          linkedIds.mangadexId,
+          linkedIds.comixUrl,
+          scanlatorPrefs,
+          linkedIds.comixSource
+        );
 
-      // Aggregate chapters — pass comixSource so correct backend is queried
-      const result = await aggregateChapters(
-        linkedIds.mangadexId,
-        linkedIds.comixUrl,
-        scanlatorPrefs,
-        linkedIds.comixSource
-      );
+        setChapters(result.groups);
+        setAllScanlators(result.allScanlators);
 
-      setChapters(result.groups);
-      setAllScanlators(result.allScanlators);
-
-      // Cache
-      setCachedChapters(anilistId, result.groups, result.allScanlators);
-
-      if (!isStale) setChaptersLoading(false);
+        setCachedChapters(
+          anilistId,
+          result.groups,
+          result.allScanlators,
+          chapterIdsFingerprint(linkedIds, scanlatorPrefs)
+        );
+      } catch (err) {
+        console.error("Chapter load failed:", err);
+      } finally {
+        setChaptersLoading(false);
+      }
     }
 
     loadChapters();
@@ -269,10 +296,12 @@ export default function MangaDetailPage({
 
   const handleChapterSelect = useCallback(
     (group: ChapterGroup) => {
+      touchChapter(anilistId, group.chapterNumber);
+      setTouchedRev((n) => n + 1);
+
       const active = group.activeVersion;
-      // External chapters open in browser, not the reader
       if (active.type === "external" && active.externalUrl) {
-        window.open(active.externalUrl, '_blank', 'noopener,noreferrer');
+        window.open(active.externalUrl, "_blank", "noopener,noreferrer");
         return;
       }
       const source = active.source;
@@ -397,16 +426,16 @@ export default function MangaDetailPage({
                     style={{
                       background:
                         type === "MANHWA"
-                          ? "rgba(0,212,255,0.15)"
+                          ? "rgba(159,231,215,0.14)"
                           : type === "MANHUA"
-                            ? "rgba(255,107,157,0.15)"
-                            : "rgba(108,99,255,0.15)",
+                            ? "rgba(240,216,168,0.14)"
+                            : "rgba(214,255,77,0.12)",
                       color:
                         type === "MANHWA"
-                          ? "#00D4FF"
+                          ? "var(--accent-cyan)"
                           : type === "MANHUA"
-                            ? "#FF6B9D"
-                            : "#6C63FF",
+                            ? "var(--accent-rose)"
+                            : "var(--accent-violet)",
                     }}
                   >
                     {type}
@@ -415,7 +444,7 @@ export default function MangaDetailPage({
                     className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
                     style={{
                       background: "rgba(255,255,255,0.06)",
-                      color: "#8B8BA7",
+                      color: "var(--text-muted)",
                     }}
                   >
                     {media.status}
@@ -458,8 +487,9 @@ export default function MangaDetailPage({
                   className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm text-white"
                   style={{
                     fontFamily: "var(--font-display)",
-                    background: "linear-gradient(135deg, #6C63FF 0%, #5B54E8 100%)",
-                    boxShadow: "0 4px 20px rgba(108,99,255,0.35)",
+                    background: "var(--accent-violet)",
+                    color: "#050504",
+                    boxShadow: "0 10px 28px rgba(214,255,77,0.16)",
                   }}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.97 }}
@@ -476,17 +506,17 @@ export default function MangaDetailPage({
                 className="w-12 h-12 flex items-center justify-center rounded-xl"
                 style={{
                   background: inLibrary
-                    ? "rgba(108,99,255,0.15)"
+                    ? "rgba(214,255,77,0.12)"
                     : "rgba(255,255,255,0.04)",
                   border: inLibrary
-                    ? "1px solid rgba(108,99,255,0.3)"
+                    ? "1px solid rgba(214,255,77,0.24)"
                     : "1px solid rgba(255,255,255,0.08)",
                 }}
                 whileTap={{ scale: 0.9 }}
                 onClick={handleLibraryToggle}
               >
                 {inLibrary ? (
-                  <BookmarkCheck size={20} style={{ color: "#6C63FF" }} />
+                  <BookmarkCheck size={20} style={{ color: "var(--accent-violet)" }} />
                 ) : (
                   <BookmarkPlus size={20} className="text-text-muted" />
                 )}
@@ -507,7 +537,7 @@ export default function MangaDetailPage({
                 <button
                   onClick={() => setSynopsisExpanded(!synopsisExpanded)}
                   className="flex items-center gap-1 mt-1 text-xs font-medium"
-                  style={{ color: "#6C63FF" }}
+                  style={{ color: "var(--accent-violet)" }}
                 >
                   {synopsisExpanded ? (
                     <>
@@ -541,9 +571,9 @@ export default function MangaDetailPage({
                 <ChapterList
                   groups={chapters}
                   allScanlators={allScanlators}
-                  anilistId={anilistId}
                   onChapterSelect={handleChapterSelect}
                   readProgress={readProgress}
+                  touchedChapters={touchedChapters}
                 />
               ) : (
                 <div className="glass p-8 text-center">
@@ -589,10 +619,10 @@ export default function MangaDetailPage({
                   p1: e.target.value || undefined,
                 })
               }
-              className="w-full p-3 rounded-xl text-sm text-text-primary"
+              className="w-full p-3 rounded-lg text-sm text-text-primary"
               style={{
-                background: "rgba(255,255,255,0.04)",
-                border: "1px solid rgba(255,255,255,0.08)",
+                backgroundColor: "rgba(243,240,230,0.055)",
+                border: "1px solid var(--border-default)",
               }}
             >
               <option value="">None</option>
@@ -616,10 +646,10 @@ export default function MangaDetailPage({
                   p2: e.target.value || undefined,
                 })
               }
-              className="w-full p-3 rounded-xl text-sm text-text-primary"
+              className="w-full p-3 rounded-lg text-sm text-text-primary"
               style={{
-                background: "rgba(255,255,255,0.04)",
-                border: "1px solid rgba(255,255,255,0.08)",
+                backgroundColor: "rgba(243,240,230,0.055)",
+                border: "1px solid var(--border-default)",
               }}
             >
               <option value="">None</option>

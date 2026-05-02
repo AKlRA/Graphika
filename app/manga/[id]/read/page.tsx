@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef, use } from "react";
+import { useEffect, useLayoutEffect, useState, useCallback, useRef, use } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -22,6 +22,7 @@ import {
   setProgress,
   getSettings,
   setSettings as saveSettings,
+  touchChapter,
   type Settings,
 } from "@/lib/storage";
 import {
@@ -37,6 +38,18 @@ interface ImageCache {
   urls: string[];
   fetchedAt: number;
   chapterId: string;
+}
+
+function resolveExternalChapterUrl(
+  source: string,
+  chId: string,
+  extParam: string | null
+): string | null {
+  if (extParam && /^https?:\/\//i.test(extParam)) return extParam;
+  if (chId.startsWith("http")) return chId;
+  const isMdUuid = source === "mangadex" && chId && !chId.startsWith("http");
+  if (isMdUuid) return `https://mangadex.org/chapter/${chId}`;
+  return null;
 }
 
 // ── Reader Page ──
@@ -58,6 +71,7 @@ export default function ReaderPage({
   const [images, setImages] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [externalRedirectFailed, setExternalRedirectFailed] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
   const [showChrome, setShowChrome] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -124,6 +138,13 @@ export default function ReaderPage({
         const dataSaver = settings.imageQuality === "datasaver";
         urls = await getChapterImages(chapterId, dataSaver);
       } else {
+        // MangaPlus is not HTML-scrapable (encrypted canvas) — same UX as empty scrape
+        const s = source.toLowerCase();
+        if (s === "mangaplus" || s === "manga_plus") {
+          setError("external");
+          setLoading(false);
+          return;
+        }
         // Comick / other source — fetch page URLs and wrap through image proxy
         const rawUrls = await comickPages(chapterId, source);
         urls = rawUrls.map((u) => buildProxiedImageUrl(u, source));
@@ -154,6 +175,26 @@ export default function ReaderPage({
   useEffect(() => {
     fetchImages();
   }, [fetchImages]);
+
+  useEffect(() => {
+    setExternalRedirectFailed(false);
+  }, [chapterId, source, chapterNumber]);
+
+  useLayoutEffect(() => {
+    if (loading || error !== "external") return;
+    const url = resolveExternalChapterUrl(source, chapterId, externalUrl);
+    if (url) {
+      window.location.replace(url);
+    } else {
+      setExternalRedirectFailed(true);
+    }
+  }, [loading, error, source, chapterId, externalUrl]);
+
+  useEffect(() => {
+    if (images.length > 0) {
+      touchChapter(anilistId, chapterNumber);
+    }
+  }, [images.length, anilistId, chapterNumber]);
 
   // ── Re-fetch on token expiry ──
   useEffect(() => {
@@ -372,7 +413,7 @@ export default function ReaderPage({
       >
         <div className="flex flex-col items-center gap-4">
           <div className="w-8 h-8 rounded-full border-2 border-transparent animate-spin"
-            style={{ borderTopColor: "#6C63FF", borderRightColor: "#6C63FF" }}
+            style={{ borderTopColor: "var(--accent-violet)", borderRightColor: "var(--accent-violet)" }}
           />
           <p className="text-sm text-text-muted" style={{ fontFamily: "var(--font-mono)" }}>
             Loading Ch {chapterNumber}…
@@ -382,85 +423,54 @@ export default function ReaderPage({
     );
   }
 
-  // ── External chapter state ──
+  // ── External: send user straight to host (no intermediate screen) ──
   if (error === "external") {
-    // For MangaDex, chapterId is a UUID → construct mangadex URL
-    // For other sources, chapterId IS the chapter URL (e.g. https://mangakatana.com/...)
-    const isMdId = source === "mangadex" && !chapterId.startsWith("http");
-    const openUrl = externalUrl
-      || (isMdId ? `https://mangadex.org/chapter/${chapterId}` : chapterId)
-      || chapterId;
+    if (externalRedirectFailed) {
+      const fallback = resolveExternalChapterUrl(source, chapterId, externalUrl);
+      return (
+        <div
+          className="fixed inset-0 flex items-center justify-center px-6"
+          style={{ background: "#0A0A0F" }}
+        >
+          <div className="glass p-6 text-center max-w-sm w-full">
+            <p className="text-sm text-text-secondary mb-4">
+              Couldn&apos;t open this chapter automatically. Try opening it on the source site.
+            </p>
+            {fallback && (
+              <motion.a
+                href={fallback}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block w-full py-3 rounded-xl font-semibold text-sm text-white mb-3"
+                style={{
+                  background: "linear-gradient(135deg, #D4A017 0%, #B8860B 100%)",
+                }}
+              >
+                Open in browser
+              </motion.a>
+            )}
+            <button
+              type="button"
+              onClick={() => router.back()}
+              className="text-xs font-medium"
+              style={{ color: "var(--accent-violet)" }}
+            >
+              Go back
+            </button>
+          </div>
+        </div>
+      );
+    }
     return (
       <div
-        className="fixed inset-0 flex items-center justify-center px-6"
+        className="fixed inset-0 flex flex-col items-center justify-center gap-3"
         style={{ background: "#0A0A0F" }}
       >
-        <div className="glass p-8 text-center max-w-sm w-full">
-          <div
-            className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
-            style={{ background: "rgba(212,160,23,0.1)" }}
-          >
-            <svg
-              width="28"
-              height="28"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#D4A017"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <line x1="2" y1="12" x2="22" y2="12" />
-              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-            </svg>
-          </div>
-          <h2
-            className="text-lg font-bold text-text-primary mb-2"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            Hosted Externally
-          </h2>
-          <p className="text-sm text-text-secondary mb-6">
-            Chapter {chapterNumber} is hosted on an external site and can&apos;t
-            be read inside Graphika.
-          </p>
-          <motion.a
-            href={openUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-semibold text-sm text-white mb-3 block"
-            style={{
-              fontFamily: "var(--font-display)",
-              background: "linear-gradient(135deg, #D4A017 0%, #B8860B 100%)",
-              boxShadow: "0 4px 20px rgba(212,160,23,0.35)",
-            }}
-            whileTap={{ scale: 0.97 }}
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-              <polyline points="15 3 21 3 21 9" />
-              <line x1="10" y1="14" x2="21" y2="3" />
-            </svg>
-            Open in Browser
-          </motion.a>
-          <button
-            onClick={() => router.back()}
-            className="text-xs font-medium"
-            style={{ color: "#6C63FF" }}
-          >
-            Go Back
-          </button>
-        </div>
+        <div
+          className="w-8 h-8 rounded-full border-2 border-transparent animate-spin"
+          style={{ borderTopColor: "var(--accent-violet)", borderRightColor: "var(--accent-violet)" }}
+        />
+        <p className="text-xs text-text-muted">Opening chapter…</p>
       </div>
     );
   }
@@ -480,7 +490,7 @@ export default function ReaderPage({
               className="px-4 py-2 rounded-xl text-sm font-medium"
               style={{
                 background: "rgba(255,255,255,0.06)",
-                color: "#F0F0FF",
+                color: "var(--text-primary)",
               }}
             >
               Go Back
@@ -492,7 +502,8 @@ export default function ReaderPage({
               }}
               className="px-4 py-2 rounded-xl text-sm font-medium text-white"
               style={{
-                background: "linear-gradient(135deg, #6C63FF 0%, #5B54E8 100%)",
+                background: "var(--accent-violet)",
+                color: "#050504",
               }}
             >
               Retry
@@ -527,7 +538,7 @@ export default function ReaderPage({
             {/* Progress Bar */}
             <div 
               className="absolute bottom-0 left-0 h-[2px] transition-all duration-300 pointer-events-none" 
-              style={{ width: `${(currentPage / Math.max(1, images.length - 1)) * 100}%`, background: '#6C63FF' }}
+              style={{ width: `${(currentPage / Math.max(1, images.length - 1)) * 100}%`, background: "var(--accent-violet)" }}
             />
             <div className="flex items-center h-14 px-3 gap-2">
               <button
@@ -647,7 +658,7 @@ export default function ReaderPage({
                   onChange={handleSeek}
                   className="flex-1 h-1 rounded-full appearance-none cursor-pointer"
                   style={{
-                    background: `linear-gradient(to right, #6C63FF ${
+                    background: `linear-gradient(to right, var(--accent-violet) ${
                       (currentPage / Math.max(images.length - 1, 1)) * 100
                     }%, rgba(255,255,255,0.1) ${
                       (currentPage / Math.max(images.length - 1, 1)) * 100
@@ -672,7 +683,7 @@ export default function ReaderPage({
                   className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-medium transition-opacity"
                   style={{
                     background: "rgba(255,255,255,0.06)",
-                    color: prevChapter ? "#F0F0FF" : "#44445A",
+                    color: prevChapter ? "var(--text-primary)" : "var(--text-muted)",
                     opacity: prevChapter ? 1 : 0.4,
                     minWidth: 44,
                     minHeight: 44,
@@ -697,7 +708,7 @@ export default function ReaderPage({
                   className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-medium transition-opacity"
                   style={{
                     background: "rgba(255,255,255,0.06)",
-                    color: nextChapter ? "#F0F0FF" : "#44445A",
+                    color: nextChapter ? "var(--text-primary)" : "var(--text-muted)",
                     opacity: nextChapter ? 1 : 0.4,
                     minWidth: 44,
                     minHeight: 44,
@@ -722,9 +733,9 @@ export default function ReaderPage({
             onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
             className="fixed bottom-6 right-6 w-12 h-12 rounded-full flex items-center justify-center z-40"
             style={{
-              background: "linear-gradient(135deg, #6C63FF 0%, #5B54E8 100%)",
-              boxShadow: "0 4px 20px rgba(108,99,255,0.4)",
-              color: "#fff",
+              background: "var(--accent-violet)",
+              boxShadow: "0 10px 28px rgba(214,255,77,0.18)",
+              color: "#050504",
             }}
           >
             <ArrowUp size={20} />
@@ -741,9 +752,9 @@ export default function ReaderPage({
         <div className="flex flex-col items-center gap-4 py-2">
           <div
             className="w-12 h-12 rounded-full flex items-center justify-center"
-            style={{ background: "rgba(0,212,255,0.1)" }}
+            style={{ background: "rgba(159,231,215,0.1)" }}
           >
-            <BookOpen size={24} style={{ color: "#00D4FF" }} />
+            <BookOpen size={24} style={{ color: "var(--accent-cyan)" }} />
           </div>
 
           <p className="text-sm text-text-secondary text-center">
@@ -763,8 +774,9 @@ export default function ReaderPage({
                 style={{
                   fontFamily: "var(--font-display)",
                   background:
-                    "linear-gradient(135deg, #6C63FF 0%, #5B54E8 100%)",
-                  boxShadow: "0 4px 20px rgba(108,99,255,0.35)",
+                    "var(--accent-violet)",
+                  color: "#050504",
+                  boxShadow: "0 10px 28px rgba(214,255,77,0.16)",
                 }}
                 whileTap={{ scale: 0.97 }}
                 onClick={() => {
@@ -784,7 +796,7 @@ export default function ReaderPage({
               router.back();
             }}
             className="text-xs font-medium"
-            style={{ color: "#6C63FF" }}
+            style={{ color: "var(--accent-violet)" }}
           >
             Back to Details
           </button>
@@ -810,14 +822,14 @@ export default function ReaderPage({
                 style={{
                   background:
                     settings.readerMode === "webtoon"
-                      ? "rgba(108,99,255,0.15)"
+                      ? "rgba(214,255,77,0.12)"
                       : "rgba(255,255,255,0.04)",
                   border:
                     settings.readerMode === "webtoon"
-                      ? "1px solid rgba(108,99,255,0.3)"
+                      ? "1px solid rgba(214,255,77,0.24)"
                       : "1px solid rgba(255,255,255,0.08)",
                   color:
-                    settings.readerMode === "webtoon" ? "#6C63FF" : "#8B8BA7",
+                    settings.readerMode === "webtoon" ? "var(--accent-violet)" : "var(--text-muted)",
                 }}
               >
                 <Smartphone size={16} />
@@ -829,14 +841,14 @@ export default function ReaderPage({
                 style={{
                   background:
                     settings.readerMode === "paged"
-                      ? "rgba(108,99,255,0.15)"
+                      ? "rgba(214,255,77,0.12)"
                       : "rgba(255,255,255,0.04)",
                   border:
                     settings.readerMode === "paged"
-                      ? "1px solid rgba(108,99,255,0.3)"
+                      ? "1px solid rgba(214,255,77,0.24)"
                       : "1px solid rgba(255,255,255,0.08)",
                   color:
-                    settings.readerMode === "paged" ? "#6C63FF" : "#8B8BA7",
+                    settings.readerMode === "paged" ? "var(--accent-violet)" : "var(--text-muted)",
                 }}
               >
                 <BookOpen size={16} />
@@ -857,16 +869,16 @@ export default function ReaderPage({
                 style={{
                   background:
                     settings.imageQuality === "original"
-                      ? "rgba(0,212,255,0.1)"
+                      ? "rgba(159,231,215,0.1)"
                       : "rgba(255,255,255,0.04)",
                   border:
                     settings.imageQuality === "original"
-                      ? "1px solid rgba(0,212,255,0.25)"
+                      ? "1px solid rgba(159,231,215,0.24)"
                       : "1px solid rgba(255,255,255,0.08)",
                   color:
                     settings.imageQuality === "original"
-                      ? "#00D4FF"
-                      : "#8B8BA7",
+                      ? "var(--accent-cyan)"
+                      : "var(--text-muted)",
                 }}
               >
                 Original
@@ -877,16 +889,16 @@ export default function ReaderPage({
                 style={{
                   background:
                     settings.imageQuality === "datasaver"
-                      ? "rgba(0,212,255,0.1)"
+                      ? "rgba(159,231,215,0.1)"
                       : "rgba(255,255,255,0.04)",
                   border:
                     settings.imageQuality === "datasaver"
-                      ? "1px solid rgba(0,212,255,0.25)"
+                      ? "1px solid rgba(159,231,215,0.24)"
                       : "1px solid rgba(255,255,255,0.08)",
                   color:
                     settings.imageQuality === "datasaver"
-                      ? "#00D4FF"
-                      : "#8B8BA7",
+                      ? "var(--accent-cyan)"
+                      : "var(--text-muted)",
                 }}
               >
                 Data Saver

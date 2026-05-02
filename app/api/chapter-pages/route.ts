@@ -17,12 +17,12 @@ const DEFAULT_UA =
 
 /** Infer the source ID from a chapter URL if not provided */
 function inferSource(url: string): string {
-  const host = new URL(url).hostname.replace("www.", "");
+  const rawHost = new URL(url).hostname.toLowerCase().replace(/^www\./, "");
   const map: Record<string, string> = {
     "mangakatana.com": "mangakatana",
     "weebcentral.com": "weebcentral",
     "comix.to": "comix",
-    "asurascans.com": "asurascan",
+    "asurascans.com": "asurascans",
     "flamecomics.xyz": "flamecomics",
     "mangacloud.org": "mangacloud",
     "mangapark.io": "mangapark",
@@ -30,8 +30,17 @@ function inferSource(url: string): string {
     "mgeko.cc": "mgeko",
     "mangaread.org": "mangaread",
     "mangaloom.com": "mangaloom",
+    "mangapill.com": "mangapill",
+    "mangakakalot.com": "mangakakalot",
+    "mangakakalot.gg": "mangakakalot",
+    "chapmanganato.to": "manganato",
+    "readmanganato.to": "manganato",
+    "manganato.to": "manganato",
   };
-  return map[host] || "unknown";
+  if (map[rawHost]) return map[rawHost];
+  if (/manganato|chapmanganato|readmanganato/i.test(rawHost)) return "manganato";
+  if (/mangakakalot/i.test(rawHost)) return "mangakakalot";
+  return "unknown";
 }
 
 /** Get the Referer for a given source */
@@ -103,8 +112,8 @@ function extractImages(html: string, source: string): string[] {
   // ── Strategy 2: <img> tags inside reader containers ──
   // Common container class names / IDs
   const containerPatterns = [
-    /class\s*=\s*["'][^"']*(?:reading-content|chapter-content|reader-area|page-break|chapter-img|wp-manga-chapter-img|image-container|chapter_img|reading-detail|pages-container)[^"']*["'][^>]*>([\s\S]*?)<\/div>/gi,
-    /id\s*=\s*["'](?:content|vungdoc|chapter-content|image-container|all|viewer|longstrip)["'][^>]*>([\s\S]*?)<\/div>/gi,
+    /class\s*=\s*["'][^"']*(?:reading-content|chapter-content|reader-area|chapter-container|container-chapter-reader|page-break|chapter-img|wp-manga-chapter-img|image-container|chapter_img|reading-detail|pages-container|vung_read|vungdoc)[^"']*["'][^>]*>([\s\S]*?)<\/div>/gi,
+    /id\s*=\s*["'](?:content|vungdoc|chapter-content|image-container|all|viewer|longstrip|chapter-reader|reader-area)["'][^>]*>([\s\S]*?)<\/div>/gi,
   ];
 
   for (const pattern of containerPatterns) {
@@ -222,7 +231,7 @@ export async function POST(request: NextRequest) {
         Referer: referer,
         "Sec-Fetch-Dest": "document",
         "Sec-Fetch-Mode": "navigate",
-        "Sec-Fetch-Site": "same-origin",
+        "Sec-Fetch-Site": "cross-site",
       },
       redirect: "follow",
     });

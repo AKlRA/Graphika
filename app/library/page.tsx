@@ -134,10 +134,10 @@ export default function LibraryPage() {
 
   const sortPillStyle = useCallback(
     (active: boolean) => ({
-      background: active ? "rgba(124, 111, 247, 0.15)" : "transparent",
+      background: active ? "rgba(214, 255, 77, 0.12)" : "transparent",
       color: active ? "var(--accent-violet)" : "var(--text-muted)",
       border: active
-        ? "1px solid rgba(124, 111, 247, 0.3)"
+        ? "1px solid rgba(214, 255, 77, 0.24)"
         : "1px solid transparent",
     }),
     []
@@ -157,7 +157,7 @@ export default function LibraryPage() {
         <main className="pt-14 md:ml-20 flex flex-col items-center justify-center min-h-[70vh] px-6">
           <div
             className="w-20 h-20 rounded-full flex items-center justify-center mb-5"
-            style={{ background: "rgba(124, 111, 247, 0.08)" }}
+            style={{ background: "rgba(214, 255, 77, 0.08)" }}
           >
             <BookOpen size={32} style={{ color: "var(--text-muted)" }} />
           </div>
@@ -172,11 +172,12 @@ export default function LibraryPage() {
           </p>
           <Link href="/search">
             <motion.button
-              className="flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-sm text-white"
+              className="flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-sm"
               style={{
                 fontFamily: "var(--font-display)",
                 background: "var(--accent-violet)",
-                boxShadow: "0 4px 20px rgba(124, 111, 247, 0.35)",
+                color: "#050504",
+                boxShadow: "0 10px 28px rgba(214, 255, 77, 0.16)",
               }}
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
@@ -289,7 +290,7 @@ export default function LibraryPage() {
         title="Remove from Library?"
       >
         <div className="flex flex-col items-center gap-4 py-2 text-center">
-          <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: "rgba(240, 98, 146, 0.1)" }}>
+          <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: "rgba(240, 216, 168, 0.1)" }}>
             <Trash2 size={28} color="var(--accent-rose)" />
           </div>
           <p className="text-sm text-text-secondary">
@@ -311,7 +312,7 @@ export default function LibraryPage() {
                 }
               }}
               className="flex-1 py-3 rounded-xl font-bold text-sm text-white"
-              style={{ background: "var(--accent-rose)", boxShadow: "0 4px 14px rgba(240, 98, 146, 0.4)" }}
+              style={{ background: "var(--accent-rose)", color: "#050504", boxShadow: "0 8px 20px rgba(240, 216, 168, 0.22)" }}
             >
               Remove
             </button>

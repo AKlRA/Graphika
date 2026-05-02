@@ -29,9 +29,49 @@ const SOURCE_REFERERS: Record<string, string> = {
   flamecomics: "https://flamecomics.xyz/",
   mangacloud: "https://mangacloud.org/",
   mangadex: "https://mangadex.org/",
+  mangapill: "https://mangapill.com/",
+  mangakakalot: "https://mangakakalot.com/",
+  manganato: "https://chapmanganato.to/",
+  mangaplus: "https://mangaplus.shueisha.co.jp/",
   // Fallback used when source is unknown
   default: "https://comick.io/",
 };
+
+/**
+ * MangaKakalot / Manganato CDNs enforce Referer matching the reader site.
+ * Prefer the image hostname when the source family is ambiguous.
+ */
+function resolveReferer(imageUrl: string, sourceHint: string): string {
+  let host = "";
+  try {
+    host = new URL(imageUrl).hostname.toLowerCase();
+  } catch {
+    return SOURCE_REFERERS[sourceHint] || SOURCE_REFERERS.default;
+  }
+
+  const hint = sourceHint.toLowerCase();
+
+  // Image host heuristics — MangaKakalot / Manganato CDNs are strict about Referer
+  if (
+    hint === "manganato" ||
+    hint === "mangakakalot" ||
+    /manganato|chapmanganato|readmanganato/i.test(host)
+  ) {
+    if (/mangakakalot|kkcdn|mkklcdn/i.test(host)) {
+      return "https://mangakakalot.com/";
+    }
+    return "https://chapmanganato.to/";
+  }
+
+  if (/mangakakalot|kkcdn|mkklcdn/i.test(host)) {
+    return "https://mangakakalot.com/";
+  }
+  if (/manganato|chapmanganato|readmanganato/i.test(host)) {
+    return "https://chapmanganato.to/";
+  }
+
+  return SOURCE_REFERERS[sourceHint] || SOURCE_REFERERS.default;
+}
 
 export const runtime = "edge"; // Use Edge Runtime for faster streaming + no 10s limit
 
@@ -69,8 +109,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Private URLs not allowed" }, { status: 403 });
   }
 
-  // Determine Referer
-  const referer = SOURCE_REFERERS[sourceHint] || SOURCE_REFERERS.default;
+  // Determine Referer (image-host aware for Manganato / MangaKakalot CDNs)
+  const referer = resolveReferer(imageUrl, sourceHint);
 
   try {
     const upstream = await fetch(imageUrl, {

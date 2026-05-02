@@ -16,18 +16,16 @@ interface HeroSectionProps {
 export default function HeroSection({ mediaList, loading = false }: HeroSectionProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  // Auto-rotate every 8 seconds
   useEffect(() => {
     if (!mediaList || mediaList.length <= 1) return;
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % mediaList.length);
-    }, 8000);
+    }, 9000);
     return () => clearInterval(interval);
   }, [mediaList]);
 
-  // Parallax effect
   const { scrollY } = useScroll();
-  const yParallax = useTransform(scrollY, [0, 500], [0, 150]);
+  const yParallax = useTransform(scrollY, [0, 500], [0, 120]);
 
   if (loading || !mediaList || mediaList.length === 0) {
     return (
@@ -37,7 +35,7 @@ export default function HeroSection({ mediaList, loading = false }: HeroSectionP
           <div className="glass p-5 w-full max-w-[460px]">
             <div className="skeleton h-6 w-48 rounded mb-3" />
             <div className="skeleton h-3 w-32 rounded mb-2" />
-            <div className="skeleton h-10 w-36 rounded-xl mt-4" />
+            <div className="skeleton h-10 w-36 rounded mt-4" />
           </div>
         </div>
       </div>
@@ -58,9 +56,8 @@ export default function HeroSection({ mediaList, loading = false }: HeroSectionP
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.8 }}
+          transition={{ duration: 0.75 }}
         >
-          {/* Banner image with parallax */}
           <motion.div className="absolute inset-0" style={{ y: yParallax }}>
             <Image
               src={bannerUrl}
@@ -69,92 +66,68 @@ export default function HeroSection({ mediaList, loading = false }: HeroSectionP
               priority
               sizes="100vw"
               className="object-cover"
-              style={{ filter: "brightness(0.65) saturate(1.3)" }}
+              style={{ filter: "brightness(0.6) saturate(1.05) contrast(1.05)" }}
             />
           </motion.div>
 
-          {/* Bottom gradient — darkens where the card sits */}
           <div
             className="absolute inset-0 z-[1]"
             style={{
               background:
-                "linear-gradient(to top, rgba(8,8,14,1) 0%, rgba(8,8,14,0.75) 35%, rgba(8,8,14,0.25) 65%, transparent 100%)",
+                "linear-gradient(to top, rgba(5,5,4,1) 0%, rgba(5,5,4,0.78) 38%, rgba(5,5,4,0.22) 68%, transparent 100%)",
             }}
           />
 
-          {/* Side vignette — cinematic feel */}
           <div
             className="absolute inset-0 z-[1]"
             style={{
               background:
-                "linear-gradient(to right, rgba(8,8,14,0.55) 0%, transparent 35%, transparent 65%, rgba(8,8,14,0.55) 100%)",
+                "linear-gradient(to right, rgba(5,5,4,0.66) 0%, transparent 34%, transparent 68%, rgba(5,5,4,0.52) 100%)",
             }}
           />
 
-          {/* Card area container - Handles Mobile Centering & Desktop Sidebar Offset */}
           <div className="absolute bottom-6 left-0 right-0 w-full px-4 flex justify-center md:justify-start md:bottom-10 md:pl-[96px] z-[5]">
-            
-            {/* Inner responsive wrapper */}
             <div className="relative w-full max-w-[460px]">
-              
-              {/* Ambient violet glow layer */}
               <div
-                className="hero-glow-layer absolute -inset-2.5 rounded-[20px] bg-transparent pointer-events-none z-0"
+                className="hero-glow-layer absolute -inset-2.5 rounded-lg bg-transparent pointer-events-none z-0"
                 style={{ filter: "blur(12px)" }}
                 aria-hidden="true"
               />
 
-              {/* The card itself */}
               <motion.div
-                className="hero-glass-card relative z-10 w-full rounded-2xl px-6 py-5"
-                initial={{ y: 24, opacity: 0 }}
+                className="hero-glass-card relative z-10 w-full rounded-lg px-5 py-5"
+                initial={{ y: 18, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.2, duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                transition={{ delay: 0.18, duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
               >
-                {/* Top edge light catch */}
                 <div
                   aria-hidden="true"
                   className="absolute top-0 left-[8%] right-[8%] h-px rounded-full pointer-events-none"
                   style={{
-                    background: "linear-gradient(to right, transparent, rgba(255,255,255,0.2), var(--accent-violet), rgba(255,255,255,0.2), transparent)",
-                    opacity: 0.6
+                    background:
+                      "linear-gradient(to right, transparent, rgba(243,240,230,0.18), var(--accent-violet), rgba(243,240,230,0.18), transparent)",
+                    opacity: 0.6,
                   }}
                 />
 
-                {/* Left accent bar */}
-                <div
-                  aria-hidden="true"
-                  className="absolute top-4 bottom-4 left-0 w-[3px] rounded-r-sm pointer-events-none"
-                  style={{
-                    background: "linear-gradient(to bottom, var(--accent-violet), var(--accent-rose))"
-                  }}
-                />
-
-                {/* Type badge */}
                 <span
-                  className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full"
-                  style={{
-                    background: type === "MANHWA" ? "var(--color-highlight-dim)" : "var(--color-accent-dim)",
-                    color: type === "MANHWA" ? "var(--accent-cyan)" : "var(--accent-violet)",
-                    border: `1px solid ${type === "MANHWA" ? "rgba(34,211,238,0.25)" : "rgba(124,111,247,0.3)"}`
-                  }}
+                  className="editorial-label"
+                  style={{ color: type === "MANHWA" ? "var(--accent-cyan)" : "var(--accent-violet)" }}
                 >
-                  {type} • Featured
+                  {type} / Featured
                 </span>
 
-                {/* Title */}
                 <h1
-                  className="text-xl md:text-2xl font-extrabold mt-2 leading-tight drop-shadow-md line-clamp-2"
+                  className="text-2xl md:text-3xl font-extrabold mt-2 leading-tight drop-shadow-md line-clamp-2"
                   style={{
                     fontFamily: "var(--font-display)",
                     color: "var(--text-primary)",
-                    letterSpacing: "-0.02em",
+                    letterSpacing: "0",
                   }}
                 >
                   {title}
                 </h1>
 
-                {/* Genres + score */}
                 <div className="flex flex-wrap gap-1.5 mt-2.5">
                   {media.genres.slice(0, 3).map((genre) => (
                     <span key={genre} className="genre-pill">
@@ -166,27 +139,27 @@ export default function HeroSection({ mediaList, loading = false }: HeroSectionP
                       className="genre-pill flex items-center gap-1"
                       style={{
                         background: "var(--color-highlight-dim)",
-                        borderColor: "rgba(34,211,238,0.28)",
+                        borderColor: "rgba(159,231,215,0.28)",
                         color: "var(--accent-cyan)",
                       }}
                     >
-                      ★ {media.averageScore}%
+                      Score {media.averageScore}
                     </span>
                   )}
                 </div>
 
-                {/* CTA button */}
                 <Link href={`/manga/${media.id}`}>
                   <motion.button
-                    className="mt-4 flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm text-white"
+                    className="mt-4 flex items-center gap-2 px-5 py-2.5 rounded-md font-semibold text-sm"
                     style={{
                       fontFamily: "var(--font-display)",
-                      background: "linear-gradient(135deg, var(--accent-violet) 0%, #9B8FFF 100%)",
-                      boxShadow: "0 4px 20px rgba(124,111,247,0.45), 0 1px 3px rgba(0,0,0,0.3)",
+                      background: "var(--accent-violet)",
+                      color: "#050504",
+                      boxShadow: "0 10px 30px rgba(214,255,77,0.18), 0 1px 3px rgba(0,0,0,0.3)",
                     }}
                     whileHover={{
-                      scale: 1.04,
-                      boxShadow: "0 6px 28px rgba(124,111,247,0.6), 0 1px 3px rgba(0,0,0,0.3)",
+                      y: -2,
+                      boxShadow: "0 14px 34px rgba(214,255,77,0.24), 0 1px 3px rgba(0,0,0,0.3)",
                     }}
                     whileTap={{ scale: 0.96 }}
                   >
@@ -200,7 +173,6 @@ export default function HeroSection({ mediaList, loading = false }: HeroSectionP
         </motion.div>
       </AnimatePresence>
 
-      {/* Crossfade dots - Shifted md:pl-20 to visually center alongside the 80px sidebar */}
       {mediaList.length > 1 && (
         <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-2 z-20 md:bottom-4 md:pl-20">
           {mediaList.map((m, idx) => (
@@ -208,11 +180,12 @@ export default function HeroSection({ mediaList, loading = false }: HeroSectionP
               key={m.id}
               onClick={() => setCurrentIndex(idx)}
               className="rounded-full transition-all duration-300"
+              aria-label={`Show featured title ${idx + 1}`}
               style={{
                 width: idx === currentIndex ? "20px" : "6px",
                 height: "6px",
-                background: idx === currentIndex ? "var(--accent-violet)" : "rgba(255,255,255,0.4)",
-                boxShadow: idx === currentIndex ? "0 0 8px var(--accent-violet)" : "none"
+                background: idx === currentIndex ? "var(--accent-violet)" : "rgba(243,240,230,0.35)",
+                boxShadow: idx === currentIndex ? "0 0 8px rgba(214,255,77,0.34)" : "none",
               }}
             />
           ))}

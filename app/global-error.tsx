@@ -29,7 +29,7 @@ export default function GlobalError({
           >
             <div
               className="w-16 h-16 rounded-full mx-auto mb-6 flex items-center justify-center"
-              style={{ background: "rgba(240, 98, 146, 0.15)" }}
+              style={{ background: "rgba(240, 216, 168, 0.14)" }}
             >
               <svg
                 width="32"
@@ -61,8 +61,8 @@ export default function GlobalError({
               style={{
                 fontFamily: "var(--font-display)",
                 background: "var(--accent-violet)",
-                color: "#fff",
-                boxShadow: "0 4px 20px rgba(124, 111, 247, 0.3)",
+                color: "#050504",
+                boxShadow: "0 10px 28px rgba(214, 255, 77, 0.16)",
               }}
             >
               Try again
