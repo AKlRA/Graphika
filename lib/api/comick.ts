@@ -80,6 +80,8 @@ interface FrontpageResponse {
 
 // ── Core fetch helper — routes through /api/comick-proxy to bypass CORS ──
 
+const COMICK_FETCH_TIMEOUT_MS = 10_000; // 10 seconds
+
 async function comickFetch<T>(
   endpoint: string,
   method: "GET" | "POST" = "POST",
@@ -87,21 +89,29 @@ async function comickFetch<T>(
 ): Promise<T> {
   // Route through our Next.js API proxy
   const proxyUrl = "/api/comick-proxy";
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), COMICK_FETCH_TIMEOUT_MS);
 
-  if (method === "POST") {
-    const res = await fetch(proxyUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ endpoint, body: body || {} }),
-    });
-    if (!res.ok) throw new Error(`Comick proxy error: ${res.status}`);
-    return res.json();
-  } else {
-    const res = await fetch(`${proxyUrl}?endpoint=${encodeURIComponent(endpoint)}`, {
-      method: "GET",
-    });
-    if (!res.ok) throw new Error(`Comick proxy GET error: ${res.status}`);
-    return res.json();
+  try {
+    if (method === "POST") {
+      const res = await fetch(proxyUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ endpoint, body: body || {} }),
+        signal: controller.signal,
+      });
+      if (!res.ok) throw new Error(`Comick proxy error: ${res.status}`);
+      return res.json();
+    } else {
+      const res = await fetch(`${proxyUrl}?endpoint=${encodeURIComponent(endpoint)}`, {
+        method: "GET",
+        signal: controller.signal,
+      });
+      if (!res.ok) throw new Error(`Comick proxy GET error: ${res.status}`);
+      return res.json();
+    }
+  } finally {
+    clearTimeout(timer);
   }
 }
 

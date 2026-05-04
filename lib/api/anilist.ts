@@ -1,6 +1,5 @@
 // ── AniList GraphQL API ──
-
-const ANILIST_URL = "https://graphql.anilist.co";
+// All requests route through /api/anilist-proxy to bypass ISP blocks.
 
 export interface AniListMedia {
   id: number;
@@ -144,7 +143,7 @@ export interface AdvancedSearchPageResult {
 }
 
 async function anilistFetch(query: string, variables: Record<string, unknown>): Promise<unknown> {
-  const res = await fetch(ANILIST_URL, {
+  const res = await fetch("/api/anilist-proxy", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ query, variables }),

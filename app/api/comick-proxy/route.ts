@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const COMICK_BASE = "https://comick-source-api.notaspider.dev";
+const UPSTREAM_TIMEOUT_MS = 10_000; // 10 seconds
 
 /**
  * Proxy POST requests to the Comick Source API to bypass CORS.
@@ -26,22 +27,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const res = await fetch(`${COMICK_BASE}${endpoint}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body || {}),
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
 
-    if (!res.ok) {
-      const text = await res.text();
-      return NextResponse.json(
-        { error: `Upstream error: ${res.status}`, details: text },
-        { status: res.status }
-      );
+    try {
+      const res = await fetch(`${COMICK_BASE}${endpoint}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body || {}),
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        return NextResponse.json(
+          { error: `Upstream error: ${res.status}`, details: text },
+          { status: res.status }
+        );
+      }
+
+      const data = await res.json();
+      return NextResponse.json(data);
+    } finally {
+      clearTimeout(timer);
     }
-
-    const data = await res.json();
-    return NextResponse.json(data);
   } catch (err) {
     console.error("Comick proxy error:", err);
     return NextResponse.json(
@@ -74,20 +83,28 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const res = await fetch(`${COMICK_BASE}${endpoint}`, {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
 
-    if (!res.ok) {
-      return NextResponse.json(
-        { error: `Upstream error: ${res.status}` },
-        { status: res.status }
-      );
+    try {
+      const res = await fetch(`${COMICK_BASE}${endpoint}`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        return NextResponse.json(
+          { error: `Upstream error: ${res.status}` },
+          { status: res.status }
+        );
+      }
+
+      const data = await res.json();
+      return NextResponse.json(data);
+    } finally {
+      clearTimeout(timer);
     }
-
-    const data = await res.json();
-    return NextResponse.json(data);
   } catch (err) {
     console.error("Comick proxy GET error:", err);
     return NextResponse.json(

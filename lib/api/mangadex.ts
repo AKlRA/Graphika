@@ -1,17 +1,43 @@
 // ── MangaDex REST API ──
-
-const MANGADEX_BASE = "https://api.mangadex.org";
+// All requests route through /api/mangadex-proxy to bypass ISP blocks.
 
 // Rate limiting: 5 req/s
 let lastRequestTime = 0;
-async function rateLimitedFetch(url: string, init?: RequestInit): Promise<Response> {
+
+const FETCH_TIMEOUT_MS = 10_000; // 10 seconds
+
+/** Wrap fetch with an AbortController timeout */
+async function fetchWithTimeout(url: string, init?: RequestInit, timeoutMs = FETCH_TIMEOUT_MS): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Fetch from MangaDex via our server-side proxy.
+ * @param path - MangaDex API path, e.g. "/manga" or "/manga/{id}/feed"
+ * @param params - URLSearchParams for query string
+ */
+async function mangadexFetch(path: string, params: URLSearchParams): Promise<Response> {
   const now = Date.now();
   const elapsed = now - lastRequestTime;
   if (elapsed < 200) {
     await new Promise((r) => setTimeout(r, 200 - elapsed));
   }
   lastRequestTime = Date.now();
-  return fetch(url, init);
+
+  // Build proxy URL: /api/mangadex-proxy?path=/manga&title=...&limit=...
+  const proxyParams = new URLSearchParams();
+  proxyParams.set("path", path);
+  for (const [key, value] of params.entries()) {
+    proxyParams.append(key, value);
+  }
+
+  return fetchWithTimeout(`/api/mangadex-proxy?${proxyParams.toString()}`);
 }
 
 export interface MangaDexManga {
@@ -73,7 +99,7 @@ export async function searchMangaDex(
     params.append("availableTranslatedLanguage[]", "en");
   }
 
-  const res = await rateLimitedFetch(`${MANGADEX_BASE}/manga?${params}`);
+  const res = await mangadexFetch("/manga", params);
   if (!res.ok) throw new Error(`MangaDex search error: ${res.status}`);
   const json = await res.json();
   return json.data as MangaDexManga[];
@@ -116,8 +142,8 @@ async function fetchMangaDexFeedPaged(
     params.append("contentRating[]", "erotica");
     params.append("contentRating[]", "pornographic");
 
-    const res = await rateLimitedFetch(
-      `${MANGADEX_BASE}/manga/${mangadexId}/feed?${params}`
+    const res = await mangadexFetch(
+      `/manga/${mangadexId}/feed`, params
     );
     if (!res.ok) throw new Error(`MangaDex feed error: ${res.status}`);
     const json = await res.json();
@@ -149,8 +175,9 @@ export async function getChapterImages(
   chapterId: string,
   dataSaver = false
 ): Promise<string[]> {
-  const res = await rateLimitedFetch(
-    `${MANGADEX_BASE}/at-home/server/${chapterId}`
+  const params = new URLSearchParams();
+  const res = await mangadexFetch(
+    `/at-home/server/${chapterId}`, params
   );
   if (!res.ok) throw new Error(`MangaDex at-home error: ${res.status}`);
   const data: MangaDexAtHome = await res.json();
