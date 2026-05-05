@@ -51,7 +51,7 @@ export interface ScanlatorPrefs {
 }
 
 export interface Settings {
-  readerMode: "webtoon" | "paged";
+  readerMode: "webtoon" | "paged" | "paged-rtl";
   imageQuality: "original" | "datasaver";
 }
 

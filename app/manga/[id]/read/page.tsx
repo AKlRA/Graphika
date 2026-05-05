@@ -13,6 +13,8 @@ import {
   BookOpen,
   ArrowUp,
   Smartphone,
+  RotateCcw,
+  ZoomIn,
 } from "lucide-react";
 
 import { getChapterImages } from "@/lib/api/mangadex";
@@ -83,6 +85,14 @@ export default function ReaderPage({
   });
 
   const readMode = settings.readerMode;
+  const isRtl = readMode === "paged-rtl";
+  const isPaged = readMode === "paged" || readMode === "paged-rtl";
+
+  // Zoom state
+  const [zoomScale, setZoomScale] = useState(1);
+  const [zoomOrigin, setZoomOrigin] = useState({ x: 50, y: 50 });
+  const lastTouchDist = useRef<number | null>(null);
+  const zoomContainerRef = useRef<HTMLDivElement>(null);
 
   const chromeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -229,11 +239,85 @@ export default function ReaderPage({
 
   // ── Preload next image (Paged mode) ──
   useEffect(() => {
-    if (readMode === "paged" && images.length > currentPage + 1) {
+    if (isPaged && images.length > currentPage + 1) {
       const img = new Image();
       img.src = images[currentPage + 1];
     }
-  }, [currentPage, images, readMode]);
+  }, [currentPage, images, isPaged]);
+
+  // ── Reset zoom on page/chapter change ──
+  useEffect(() => {
+    setZoomScale(1);
+    setZoomOrigin({ x: 50, y: 50 });
+  }, [currentPage, chapterId]);
+
+  // ── Pinch-to-zoom (touch) ──
+  useEffect(() => {
+    const el = zoomContainerRef.current;
+    if (!el) return;
+
+    function onTouchStart(e: TouchEvent) {
+      if (e.touches.length === 2) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        lastTouchDist.current = Math.hypot(dx, dy);
+      }
+    }
+
+    function onTouchMove(e: TouchEvent) {
+      if (e.touches.length === 2 && lastTouchDist.current !== null && el) {
+        e.preventDefault();
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const dist = Math.hypot(dx, dy);
+        const delta = dist / lastTouchDist.current;
+        lastTouchDist.current = dist;
+
+        // Set origin to midpoint of fingers
+        const rect = el.getBoundingClientRect();
+        const mx = ((e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left) / rect.width * 100;
+        const my = ((e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top) / rect.height * 100;
+        setZoomOrigin({ x: mx, y: my });
+
+        setZoomScale((prev) => Math.min(5, Math.max(1, prev * delta)));
+      }
+    }
+
+    function onTouchEnd() {
+      lastTouchDist.current = null;
+    }
+
+    el.addEventListener("touchstart", onTouchStart, { passive: false });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    el.addEventListener("touchend", onTouchEnd);
+
+    return () => {
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", onTouchEnd);
+    };
+  }, []);
+
+  // ── Mouse wheel zoom (desktop) ──
+  useEffect(() => {
+    const el = zoomContainerRef.current;
+    if (!el) return;
+
+    function onWheel(e: WheelEvent) {
+      if ((e.ctrlKey || e.metaKey) && el) {
+        e.preventDefault();
+        const rect = el.getBoundingClientRect();
+        const mx = (e.clientX - rect.left) / rect.width * 100;
+        const my = (e.clientY - rect.top) / rect.height * 100;
+        setZoomOrigin({ x: mx, y: my });
+        const delta = e.deltaY > 0 ? 0.9 : 1.1;
+        setZoomScale((prev) => Math.min(5, Math.max(1, prev * delta)));
+      }
+    }
+
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
 
   // ── Scroll to top FAB (Webtoon mode) ──
   useEffect(() => {
@@ -299,32 +383,35 @@ export default function ReaderPage({
     [images.length, nextChapter, saveReadProgress, resetChromeTimer]
   );
 
-  // ── Tap zones (paged mode) ──
+  // ── Tap zones (paged mode) — RTL reverses left/right ──
   const handlePagedTap = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
+      // Don't navigate if zoomed in
+      if (zoomScale > 1.1) return;
+
       const rect = e.currentTarget.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const width = rect.width;
       const third = width / 3;
 
       if (x < third) {
-        // Left third: previous page
-        goToPage(currentPage - 1);
+        // Left third
+        goToPage(isRtl ? currentPage + 1 : currentPage - 1);
       } else if (x > third * 2) {
-        // Right third: next page
-        goToPage(currentPage + 1);
+        // Right third
+        goToPage(isRtl ? currentPage - 1 : currentPage + 1);
       } else {
         // Center: toggle chrome
         setShowChrome((prev) => !prev);
         if (!showChrome) resetChromeTimer();
       }
     },
-    [currentPage, goToPage, showChrome, resetChromeTimer]
+    [currentPage, goToPage, showChrome, resetChromeTimer, isRtl, zoomScale]
   );
 
   // ── Webtoon mode: track visible page via IntersectionObserver ──
   useEffect(() => {
-    if (settings.readerMode !== "webtoon" || images.length === 0) return;
+    if (settings.readerMode === "paged" || settings.readerMode === "paged-rtl" || images.length === 0) return;
 
     observerRef.current = new IntersectionObserver(
       (entries) => {
@@ -575,56 +662,89 @@ export default function ReaderPage({
       </AnimatePresence>
 
       {/* ── IMAGE AREA ── */}
-      {settings.readerMode === "webtoon" ? (
-        /* Webtoon: vertical continuous scroll */
-        <div
-          ref={scrollContainerRef}
-          className="h-full overflow-y-auto"
-          onScroll={handleWebtoonScroll}
-          onClick={() => {
-            setShowChrome((prev) => !prev);
-            if (!showChrome) resetChromeTimer();
-          }}
-        >
-          <div className="pt-14 pb-20">
-            {images.map((url, i) => (
-              <div
-                key={i}
-                ref={(el) => registerImageRef(i, el)}
-                data-page-index={i}
-                className="relative w-full"
-                style={{ minHeight: 200 }}
-              >
-                <img
-                  src={url}
-                  alt={`Page ${i + 1}`}
-                  className="w-full h-auto block"
-                  loading={i < 3 ? "eager" : "lazy"}
-                  style={{ maxWidth: "100%", display: "block" }}
-                />
-              </div>
-            ))}
+      <div ref={zoomContainerRef} className="h-full">
+        {settings.readerMode === "webtoon" ? (
+          /* Webtoon: vertical continuous scroll */
+          <div
+            ref={scrollContainerRef}
+            className="h-full overflow-y-auto"
+            onScroll={handleWebtoonScroll}
+            onClick={() => {
+              setShowChrome((prev) => !prev);
+              if (!showChrome) resetChromeTimer();
+            }}
+            style={{
+              transform: `scale(${zoomScale})`,
+              transformOrigin: `${zoomOrigin.x}% ${zoomOrigin.y}%`,
+              transition: zoomScale === 1 ? "transform 0.2s ease" : "none",
+            }}
+          >
+            <div className="pt-14 pb-20">
+              {images.map((url, i) => (
+                <div
+                  key={i}
+                  ref={(el) => registerImageRef(i, el)}
+                  data-page-index={i}
+                  className="relative w-full"
+                  style={{ minHeight: 200 }}
+                >
+                  <img
+                    src={url}
+                    alt={`Page ${i + 1}`}
+                    className="w-full h-auto block"
+                    loading={i < 3 ? "eager" : "lazy"}
+                    style={{ maxWidth: "100%", display: "block" }}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      ) : (
-        /* Paged: single page view */
-        <div
-          className="h-full flex items-center justify-center cursor-pointer select-none"
-          onClick={handlePagedTap}
-        >
-          {images[currentPage] && (
-            <motion.img
-              key={currentPage}
-              src={images[currentPage]}
-              alt={`Page ${currentPage + 1}`}
-              className="max-h-full max-w-full object-contain"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.15 }}
-            />
-          )}
-        </div>
-      )}
+        ) : (
+          /* Paged / Paged-RTL: single page view with zoom */
+          <div
+            className="h-full flex items-center justify-center cursor-pointer select-none overflow-hidden"
+            onClick={handlePagedTap}
+            style={{
+              transform: `scale(${zoomScale})`,
+              transformOrigin: `${zoomOrigin.x}% ${zoomOrigin.y}%`,
+              transition: zoomScale === 1 ? "transform 0.2s ease" : "none",
+            }}
+          >
+            {images[currentPage] && (
+              <motion.img
+                key={currentPage}
+                src={images[currentPage]}
+                alt={`Page ${currentPage + 1}`}
+                className="max-h-full max-w-full object-contain"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.15 }}
+              />
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── ZOOM RESET FAB ── */}
+      <AnimatePresence>
+        {zoomScale > 1.05 && (
+          <motion.button
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            onClick={() => { setZoomScale(1); setZoomOrigin({ x: 50, y: 50 }); }}
+            className="fixed bottom-24 right-4 w-10 h-10 rounded-full flex items-center justify-center z-50"
+            style={{
+              background: "rgba(255,255,255,0.12)",
+              backdropFilter: "blur(12px)",
+              border: "1px solid rgba(255,255,255,0.15)",
+            }}
+            title="Reset zoom"
+          >
+            <RotateCcw size={16} className="text-white" />
+          </motion.button>
+        )}
+      </AnimatePresence>
 
       {/* ── BOTTOM BAR ── */}
       <AnimatePresence>
@@ -853,9 +973,62 @@ export default function ReaderPage({
                 }}
               >
                 <BookOpen size={16} />
-                Paged
+                Paged (L→R)
+              </button>
+              <button
+                onClick={() => updateSettings({ readerMode: "paged-rtl" })}
+                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium transition-all"
+                style={{
+                  background:
+                    settings.readerMode === "paged-rtl"
+                      ? "rgba(214,255,77,0.12)"
+                      : "rgba(255,255,255,0.04)",
+                  border:
+                    settings.readerMode === "paged-rtl"
+                      ? "1px solid rgba(214,255,77,0.24)"
+                      : "1px solid rgba(255,255,255,0.08)",
+                  color:
+                    settings.readerMode === "paged-rtl" ? "var(--accent-violet)" : "var(--text-muted)",
+                }}
+              >
+                <BookOpen size={16} style={{ transform: "scaleX(-1)" }} />
+                Paged (R→L)
               </button>
             </div>
+          </div>
+
+          {/* Zoom */}
+          <div>
+            <label className="text-xs font-medium text-text-secondary mb-2 block">
+              Zoom — {Math.round(zoomScale * 100)}%
+            </label>
+            <div className="flex items-center gap-3">
+              <ZoomIn size={14} className="text-text-muted flex-shrink-0" />
+              <input
+                type="range"
+                min={100}
+                max={500}
+                value={Math.round(zoomScale * 100)}
+                onChange={(e) => setZoomScale(parseInt(e.target.value, 10) / 100)}
+                className="flex-1 h-1 rounded-full appearance-none cursor-pointer"
+                style={{
+                  background: `linear-gradient(to right, var(--accent-violet) ${((zoomScale - 1) / 4) * 100}%, rgba(255,255,255,0.1) ${((zoomScale - 1) / 4) * 100}%)`,
+                }}
+              />
+              <button
+                onClick={() => { setZoomScale(1); setZoomOrigin({ x: 50, y: 50 }); }}
+                className="text-xs px-2 py-1 rounded-lg"
+                style={{
+                  background: "rgba(255,255,255,0.06)",
+                  color: "var(--text-muted)",
+                }}
+              >
+                Reset
+              </button>
+            </div>
+            <p className="text-[10px] text-text-muted mt-1">
+              Pinch to zoom on mobile · Ctrl+Scroll on desktop
+            </p>
           </div>
 
           {/* Image Quality */}
