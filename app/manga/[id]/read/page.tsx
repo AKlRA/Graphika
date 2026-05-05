@@ -134,9 +134,10 @@ export default function ReaderPage({
       let urls: string[];
 
       if (isMangaDex) {
-        // MangaDex AT-Home — direct image URLs (no proxy needed)
+        // MangaDex AT-Home — get image URLs then proxy them to avoid CDN Referer blocks
         const dataSaver = settings.imageQuality === "datasaver";
-        urls = await getChapterImages(chapterId, dataSaver);
+        const rawUrls = await getChapterImages(chapterId, dataSaver);
+        urls = rawUrls.map((u) => buildProxiedImageUrl(u, "mangadex"));
       } else {
         // MangaPlus is not HTML-scrapable (encrypted canvas) — same UX as empty scrape
         const s = source.toLowerCase();
