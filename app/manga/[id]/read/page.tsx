@@ -14,7 +14,6 @@ import {
   ArrowUp,
   Smartphone,
   RotateCcw,
-  ZoomIn,
 } from "lucide-react";
 
 import { getChapterImages } from "@/lib/api/mangadex";
@@ -936,10 +935,10 @@ export default function ReaderPage({
             <label className="text-xs font-medium text-text-secondary mb-2 block">
               Reader Mode
             </label>
-            <div className="flex gap-2">
+            <div className="flex gap-1.5">
               <button
                 onClick={() => updateSettings({ readerMode: "webtoon" })}
-                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium transition-all"
+                className="flex-1 flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl text-[11px] font-medium transition-all"
                 style={{
                   background:
                     settings.readerMode === "webtoon"
@@ -953,12 +952,12 @@ export default function ReaderPage({
                     settings.readerMode === "webtoon" ? "var(--accent-violet)" : "var(--text-muted)",
                 }}
               >
-                <Smartphone size={16} />
-                Webtoon
+                <Smartphone size={14} />
+                Scroll
               </button>
               <button
                 onClick={() => updateSettings({ readerMode: "paged" })}
-                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium transition-all"
+                className="flex-1 flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl text-[11px] font-medium transition-all"
                 style={{
                   background:
                     settings.readerMode === "paged"
@@ -972,12 +971,12 @@ export default function ReaderPage({
                     settings.readerMode === "paged" ? "var(--accent-violet)" : "var(--text-muted)",
                 }}
               >
-                <BookOpen size={16} />
-                Paged (L→R)
+                <BookOpen size={14} />
+                L→R
               </button>
               <button
                 onClick={() => updateSettings({ readerMode: "paged-rtl" })}
-                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium transition-all"
+                className="flex-1 flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl text-[11px] font-medium transition-all"
                 style={{
                   background:
                     settings.readerMode === "paged-rtl"
@@ -991,45 +990,12 @@ export default function ReaderPage({
                     settings.readerMode === "paged-rtl" ? "var(--accent-violet)" : "var(--text-muted)",
                 }}
               >
-                <BookOpen size={16} style={{ transform: "scaleX(-1)" }} />
-                Paged (R→L)
+                <BookOpen size={14} style={{ transform: "scaleX(-1)" }} />
+                R→L
               </button>
             </div>
           </div>
 
-          {/* Zoom */}
-          <div>
-            <label className="text-xs font-medium text-text-secondary mb-2 block">
-              Zoom — {Math.round(zoomScale * 100)}%
-            </label>
-            <div className="flex items-center gap-3">
-              <ZoomIn size={14} className="text-text-muted flex-shrink-0" />
-              <input
-                type="range"
-                min={100}
-                max={500}
-                value={Math.round(zoomScale * 100)}
-                onChange={(e) => setZoomScale(parseInt(e.target.value, 10) / 100)}
-                className="flex-1 h-1 rounded-full appearance-none cursor-pointer"
-                style={{
-                  background: `linear-gradient(to right, var(--accent-violet) ${((zoomScale - 1) / 4) * 100}%, rgba(255,255,255,0.1) ${((zoomScale - 1) / 4) * 100}%)`,
-                }}
-              />
-              <button
-                onClick={() => { setZoomScale(1); setZoomOrigin({ x: 50, y: 50 }); }}
-                className="text-xs px-2 py-1 rounded-lg"
-                style={{
-                  background: "rgba(255,255,255,0.06)",
-                  color: "var(--text-muted)",
-                }}
-              >
-                Reset
-              </button>
-            </div>
-            <p className="text-[10px] text-text-muted mt-1">
-              Pinch to zoom on mobile · Ctrl+Scroll on desktop
-            </p>
-          </div>
 
           {/* Image Quality */}
           <div>
