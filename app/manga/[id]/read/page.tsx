@@ -89,8 +89,16 @@ export default function ReaderPage({
 
   // Zoom state
   const [zoomScale, setZoomScale] = useState(1);
-  const [zoomOrigin, setZoomOrigin] = useState({ x: 50, y: 50 });
+  const [zoomPos, setZoomPos] = useState({ x: 0, y: 0 }); // Pan translation
+  
+  // Keep refs up-to-date for event listeners
+  const zoomStateRef = useRef({ scale: 1, pos: { x: 0, y: 0 } });
+  useEffect(() => {
+    zoomStateRef.current = { scale: zoomScale, pos: zoomPos };
+  }, [zoomScale, zoomPos]);
+
   const lastTouchDist = useRef<number | null>(null);
+  const lastPanPoint = useRef<{ x: number; y: number } | null>(null);
   const zoomContainerRef = useRef<HTMLDivElement>(null);
 
   // Tap state for double-tap
@@ -252,43 +260,74 @@ export default function ReaderPage({
   // ── Reset zoom on page/chapter change ──
   useEffect(() => {
     setZoomScale(1);
-    setZoomOrigin({ x: 50, y: 50 });
+    setZoomPos({ x: 0, y: 0 });
   }, [currentPage, chapterId]);
 
-  // ── Pinch-to-zoom (touch) ──
+  // ── Pinch-to-zoom & Pan (touch) ──
   useEffect(() => {
     const el = zoomContainerRef.current;
     if (!el) return;
 
     function onTouchStart(e: TouchEvent) {
       if (e.touches.length === 2) {
+        // Prevent native zoom
+        if (e.cancelable) e.preventDefault();
         const dx = e.touches[0].clientX - e.touches[1].clientX;
         const dy = e.touches[0].clientY - e.touches[1].clientY;
         lastTouchDist.current = Math.hypot(dx, dy);
+        lastPanPoint.current = null;
+      } else if (e.touches.length === 1 && zoomStateRef.current.scale > 1) {
+        // Start panning
+        lastPanPoint.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
       }
     }
 
     function onTouchMove(e: TouchEvent) {
       if (e.touches.length === 2 && lastTouchDist.current !== null && el) {
-        e.preventDefault();
+        if (e.cancelable) e.preventDefault();
         const dx = e.touches[0].clientX - e.touches[1].clientX;
         const dy = e.touches[0].clientY - e.touches[1].clientY;
         const dist = Math.hypot(dx, dy);
         const delta = dist / lastTouchDist.current;
         lastTouchDist.current = dist;
 
-        // Set origin to midpoint of fingers
-        const rect = el.getBoundingClientRect();
-        const mx = ((e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left) / rect.width * 100;
-        const my = ((e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top) / rect.height * 100;
-        setZoomOrigin({ x: mx, y: my });
+        const { scale: prevScale, pos: prevPos } = zoomStateRef.current;
+        const newScale = Math.min(5, Math.max(1, prevScale * delta));
+        const scaleRatio = newScale / prevScale;
 
-        setZoomScale((prev) => Math.min(5, Math.max(1, prev * delta)));
+        // Pinch center relative to container
+        const rect = el.getBoundingClientRect();
+        const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
+        const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
+
+        // Adjust translation to keep the pinch center in place
+        const newX = cx - (cx - prevPos.x) * scaleRatio;
+        const newY = cy - (cy - prevPos.y) * scaleRatio;
+
+        setZoomScale(newScale);
+        if (newScale === 1) {
+          setZoomPos({ x: 0, y: 0 });
+        } else {
+          setZoomPos({ x: newX, y: newY });
+        }
+      } else if (e.touches.length === 1 && lastPanPoint.current !== null && zoomStateRef.current.scale > 1) {
+        // Panning
+        if (e.cancelable) e.preventDefault();
+        const currentX = e.touches[0].clientX;
+        const currentY = e.touches[0].clientY;
+        const dx = currentX - lastPanPoint.current.x;
+        const dy = currentY - lastPanPoint.current.y;
+        
+        lastPanPoint.current = { x: currentX, y: currentY };
+        
+        const { pos } = zoomStateRef.current;
+        setZoomPos({ x: pos.x + dx, y: pos.y + dy });
       }
     }
 
     function onTouchEnd() {
       lastTouchDist.current = null;
+      lastPanPoint.current = null;
     }
 
     el.addEventListener("touchstart", onTouchStart, { passive: false });
@@ -311,11 +350,23 @@ export default function ReaderPage({
       if ((e.ctrlKey || e.metaKey) && el) {
         e.preventDefault();
         const rect = el.getBoundingClientRect();
-        const mx = (e.clientX - rect.left) / rect.width * 100;
-        const my = (e.clientY - rect.top) / rect.height * 100;
-        setZoomOrigin({ x: mx, y: my });
+        const cx = e.clientX - rect.left;
+        const cy = e.clientY - rect.top;
+        
         const delta = e.deltaY > 0 ? 0.9 : 1.1;
-        setZoomScale((prev) => Math.min(5, Math.max(1, prev * delta)));
+        const { scale: prevScale, pos: prevPos } = zoomStateRef.current;
+        const newScale = Math.min(5, Math.max(1, prevScale * delta));
+        const scaleRatio = newScale / prevScale;
+
+        const newX = cx - (cx - prevPos.x) * scaleRatio;
+        const newY = cy - (cy - prevPos.y) * scaleRatio;
+
+        setZoomScale(newScale);
+        if (newScale === 1) {
+          setZoomPos({ x: 0, y: 0 });
+        } else {
+          setZoomPos({ x: newX, y: newY });
+        }
       }
     }
 
@@ -392,12 +443,17 @@ export default function ReaderPage({
     (clientX: number, clientY: number, rect: DOMRect) => {
       if (zoomScale > 1) {
         setZoomScale(1);
-        setZoomOrigin({ x: 50, y: 50 });
+        setZoomPos({ x: 0, y: 0 });
       } else {
-        const mx = ((clientX - rect.left) / rect.width) * 100;
-        const my = ((clientY - rect.top) / rect.height) * 100;
-        setZoomOrigin({ x: mx, y: my });
-        setZoomScale(2.5); // Zoom in
+        const cx = clientX - rect.left;
+        const cy = clientY - rect.top;
+        const newScale = 2.5;
+        // Center the tap point
+        const newX = cx - cx * newScale;
+        const newY = cy - cy * newScale;
+        
+        setZoomScale(newScale);
+        setZoomPos({ x: newX, y: newY });
       }
     },
     [zoomScale]
@@ -743,8 +799,8 @@ export default function ReaderPage({
             onScroll={handleWebtoonScroll}
             onClick={handleWebtoonTap}
             style={{
-              transform: `scale(${zoomScale})`,
-              transformOrigin: `${zoomOrigin.x}% ${zoomOrigin.y}%`,
+              transform: `translate(${zoomPos.x}px, ${zoomPos.y}px) scale(${zoomScale})`,
+              transformOrigin: "0 0",
               transition: zoomScale === 1 ? "transform 0.2s ease" : "none",
             }}
           >
@@ -774,8 +830,8 @@ export default function ReaderPage({
             className="h-full flex items-center justify-center cursor-pointer select-none overflow-hidden"
             onClick={handlePagedTap}
             style={{
-              transform: `scale(${zoomScale})`,
-              transformOrigin: `${zoomOrigin.x}% ${zoomOrigin.y}%`,
+              transform: `translate(${zoomPos.x}px, ${zoomPos.y}px) scale(${zoomScale})`,
+              transformOrigin: "0 0",
               transition: zoomScale === 1 ? "transform 0.2s ease" : "none",
             }}
           >
@@ -801,7 +857,7 @@ export default function ReaderPage({
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.8 }}
-            onClick={() => { setZoomScale(1); setZoomOrigin({ x: 50, y: 50 }); }}
+            onClick={() => { setZoomScale(1); setZoomPos({ x: 0, y: 0 }); }}
             className="fixed bottom-24 right-4 w-10 h-10 rounded-full flex items-center justify-center z-50"
             style={{
               background: "rgba(255,255,255,0.12)",
