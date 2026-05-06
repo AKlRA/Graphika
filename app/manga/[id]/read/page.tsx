@@ -304,14 +304,10 @@ export default function ReaderPage({
         const newX = cx - (cx - prevPos.x) * scaleRatio;
         const newY = cy - (cy - prevPos.y) * scaleRatio;
 
-        zoomStateRef.current.scale = newScale;
-        
         setZoomScale(newScale);
         if (newScale === 1) {
-          zoomStateRef.current.pos = { x: 0, y: 0 };
           setZoomPos({ x: 0, y: 0 });
         } else {
-          zoomStateRef.current.pos = { x: newX, y: newY };
           setZoomPos({ x: newX, y: newY });
         }
       } else if (e.touches.length === 1 && lastPanPoint.current !== null && zoomStateRef.current.scale > 1) {
@@ -325,10 +321,7 @@ export default function ReaderPage({
         lastPanPoint.current = { x: currentX, y: currentY };
         
         const { pos } = zoomStateRef.current;
-        const newPos = { x: pos.x + dx, y: pos.y + dy };
-        
-        zoomStateRef.current.pos = newPos;
-        setZoomPos(newPos);
+        setZoomPos({ x: pos.x + dx, y: pos.y + dy });
       }
     }
 
@@ -368,14 +361,10 @@ export default function ReaderPage({
         const newX = cx - (cx - prevPos.x) * scaleRatio;
         const newY = cy - (cy - prevPos.y) * scaleRatio;
 
-        zoomStateRef.current.scale = newScale;
-
         setZoomScale(newScale);
         if (newScale === 1) {
-          zoomStateRef.current.pos = { x: 0, y: 0 };
           setZoomPos({ x: 0, y: 0 });
         } else {
-          zoomStateRef.current.pos = { x: newX, y: newY };
           setZoomPos({ x: newX, y: newY });
         }
       }
@@ -453,8 +442,6 @@ export default function ReaderPage({
   const handleDoubleTap = useCallback(
     (clientX: number, clientY: number, rect: DOMRect) => {
       if (zoomScale > 1) {
-        zoomStateRef.current.scale = 1;
-        zoomStateRef.current.pos = { x: 0, y: 0 };
         setZoomScale(1);
         setZoomPos({ x: 0, y: 0 });
       } else {
@@ -465,8 +452,6 @@ export default function ReaderPage({
         const newX = cx - cx * newScale;
         const newY = cy - cy * newScale;
         
-        zoomStateRef.current.scale = newScale;
-        zoomStateRef.current.pos = { x: newX, y: newY };
         setZoomScale(newScale);
         setZoomPos({ x: newX, y: newY });
       }
