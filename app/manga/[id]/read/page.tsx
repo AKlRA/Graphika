@@ -93,6 +93,10 @@ export default function ReaderPage({
   const lastTouchDist = useRef<number | null>(null);
   const zoomContainerRef = useRef<HTMLDivElement>(null);
 
+  // Tap state for double-tap
+  const lastTapRef = useRef<{ time: number; x: number; y: number } | null>(null);
+  const tapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const chromeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const imageCacheRef = useRef<ImageCache | null>(null);
@@ -233,6 +237,7 @@ export default function ReaderPage({
     resetChromeTimer();
     return () => {
       if (chromeTimeoutRef.current) clearTimeout(chromeTimeoutRef.current);
+      if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
     };
   }, [resetChromeTimer]);
 
@@ -382,30 +387,94 @@ export default function ReaderPage({
     [images.length, nextChapter, saveReadProgress, resetChromeTimer]
   );
 
+  // ── Double Tap to Zoom ──
+  const handleDoubleTap = useCallback(
+    (clientX: number, clientY: number, rect: DOMRect) => {
+      if (zoomScale > 1) {
+        setZoomScale(1);
+        setZoomOrigin({ x: 50, y: 50 });
+      } else {
+        const mx = ((clientX - rect.left) / rect.width) * 100;
+        const my = ((clientY - rect.top) / rect.height) * 100;
+        setZoomOrigin({ x: mx, y: my });
+        setZoomScale(2.5); // Zoom in
+      }
+    },
+    [zoomScale]
+  );
+
   // ── Tap zones (paged mode) — RTL reverses left/right ──
   const handlePagedTap = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
-      // Don't navigate if zoomed in
-      if (zoomScale > 1.1) return;
-
       const rect = e.currentTarget.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const width = rect.width;
-      const third = width / 3;
+      const clientX = e.clientX;
+      const clientY = e.clientY;
+      const now = Date.now();
 
-      if (x < third) {
-        // Left third
-        goToPage(isRtl ? currentPage + 1 : currentPage - 1);
-      } else if (x > third * 2) {
-        // Right third
-        goToPage(isRtl ? currentPage - 1 : currentPage + 1);
-      } else {
-        // Center: toggle chrome
+      if (lastTapRef.current && now - lastTapRef.current.time < 300) {
+        const dist = Math.hypot(clientX - lastTapRef.current.x, clientY - lastTapRef.current.y);
+        if (dist < 40) {
+          if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
+          lastTapRef.current = null;
+          handleDoubleTap(clientX, clientY, rect);
+          return;
+        }
+      }
+
+      lastTapRef.current = { time: now, x: clientX, y: clientY };
+
+      if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
+      tapTimeoutRef.current = setTimeout(() => {
+        // Don't navigate if zoomed in
+        if (zoomScale > 1.1) return;
+
+        const x = clientX - rect.left;
+        const width = rect.width;
+        const third = width / 3;
+
+        if (x < third) {
+          // Left third
+          goToPage(isRtl ? currentPage + 1 : currentPage - 1);
+        } else if (x > third * 2) {
+          // Right third
+          goToPage(isRtl ? currentPage - 1 : currentPage + 1);
+        } else {
+          // Center: toggle chrome
+          setShowChrome((prev) => !prev);
+          if (!showChrome) resetChromeTimer();
+        }
+      }, 300);
+    },
+    [currentPage, goToPage, showChrome, resetChromeTimer, isRtl, zoomScale, handleDoubleTap]
+  );
+
+  // ── Tap (webtoon mode) ──
+  const handleWebtoonTap = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const clientX = e.clientX;
+      const clientY = e.clientY;
+      const now = Date.now();
+
+      if (lastTapRef.current && now - lastTapRef.current.time < 300) {
+        const dist = Math.hypot(clientX - lastTapRef.current.x, clientY - lastTapRef.current.y);
+        if (dist < 40) {
+          if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
+          lastTapRef.current = null;
+          handleDoubleTap(clientX, clientY, rect);
+          return;
+        }
+      }
+
+      lastTapRef.current = { time: now, x: clientX, y: clientY };
+
+      if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
+      tapTimeoutRef.current = setTimeout(() => {
         setShowChrome((prev) => !prev);
         if (!showChrome) resetChromeTimer();
-      }
+      }, 300);
     },
-    [currentPage, goToPage, showChrome, resetChromeTimer, isRtl, zoomScale]
+    [showChrome, resetChromeTimer, handleDoubleTap]
   );
 
   // ── Webtoon mode: track visible page via IntersectionObserver ──
@@ -661,17 +730,18 @@ export default function ReaderPage({
       </AnimatePresence>
 
       {/* ── IMAGE AREA ── */}
-      <div ref={zoomContainerRef} className="h-full">
+      <div 
+        ref={zoomContainerRef} 
+        className="h-full"
+        style={{ touchAction: zoomScale > 1 ? "none" : "pan-x pan-y" }}
+      >
         {settings.readerMode === "webtoon" ? (
           /* Webtoon: vertical continuous scroll */
           <div
             ref={scrollContainerRef}
             className="h-full overflow-y-auto"
             onScroll={handleWebtoonScroll}
-            onClick={() => {
-              setShowChrome((prev) => !prev);
-              if (!showChrome) resetChromeTimer();
-            }}
+            onClick={handleWebtoonTap}
             style={{
               transform: `scale(${zoomScale})`,
               transformOrigin: `${zoomOrigin.x}% ${zoomOrigin.y}%`,
@@ -938,7 +1008,7 @@ export default function ReaderPage({
             <div className="flex gap-1.5">
               <button
                 onClick={() => updateSettings({ readerMode: "webtoon" })}
-                className="flex-1 flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl text-[11px] font-medium transition-all"
+                className="flex-1 flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl text-[10px] font-medium transition-all"
                 style={{
                   background:
                     settings.readerMode === "webtoon"
@@ -957,7 +1027,7 @@ export default function ReaderPage({
               </button>
               <button
                 onClick={() => updateSettings({ readerMode: "paged" })}
-                className="flex-1 flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl text-[11px] font-medium transition-all"
+                className="flex-1 flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl text-[10px] font-medium transition-all"
                 style={{
                   background:
                     settings.readerMode === "paged"
@@ -976,7 +1046,7 @@ export default function ReaderPage({
               </button>
               <button
                 onClick={() => updateSettings({ readerMode: "paged-rtl" })}
-                className="flex-1 flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl text-[11px] font-medium transition-all"
+                className="flex-1 flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl text-[10px] font-medium transition-all"
                 style={{
                   background:
                     settings.readerMode === "paged-rtl"
